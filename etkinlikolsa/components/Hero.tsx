@@ -23,7 +23,7 @@ export default function Hero() {
       </div>
 
       {/* Hero içerik */}
-      <div className="relative mx-auto max-w-7xl px-5 pb-28 pt-16 lg:px-8 lg:pb-32 lg:pt-24">
+      <div <div className="relative z-20 mx-auto max-w-6xl px-5 lg:px-8">
         <div className="max-w-xl">
           <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-sky-light">
             İstanbul'un etkinlik platformu
