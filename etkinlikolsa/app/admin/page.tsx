@@ -13,6 +13,12 @@ type Stats = {
   monthRevenue: number;
 };
 
+type MenuItem = {
+  title: string;
+  icon: string;
+  path: string;
+};
+
 export default function AdminPage() {
   const router = useRouter();
 
@@ -122,14 +128,17 @@ export default function AdminPage() {
       ]);
 
       const monthRevenue =
-        monthRevenueResult.data?.reduce((total, reservation) => {
-          const amount =
-            reservation.customer_price ??
-            reservation.total_price ??
-            0;
+        monthRevenueResult.data?.reduce(
+          (total, reservation) => {
+            const amount =
+              reservation.customer_price ??
+              reservation.total_price ??
+              0;
 
-          return total + Number(amount);
-        }, 0) ?? 0;
+            return total + Number(amount);
+          },
+          0
+        ) ?? 0;
 
       setStats({
         customers: customersResult.count ?? 0,
@@ -169,51 +178,61 @@ export default function AdminPage() {
     return null;
   }
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     {
       title: "Dashboard",
       icon: "📊",
-      active: true,
+      path: "/admin",
     },
     {
       title: "Etkinlikler",
       icon: "🎫",
+      path: "/admin/etkinlikler",
     },
     {
       title: "Kategoriler",
       icon: "📂",
+      path: "/admin/kategoriler",
     },
     {
       title: "Ek Hizmetler",
       icon: "➕",
+      path: "/admin/ek-hizmetler",
     },
     {
       title: "Rezervasyonlar",
       icon: "📅",
+      path: "/admin/rezervasyonlar",
     },
     {
       title: "Müşteriler",
       icon: "👥",
+      path: "/admin/musteriler",
     },
     {
       title: "Tedarikçiler",
       icon: "🚤",
+      path: "/admin/tedarikciler",
     },
     {
       title: "Yorumlar",
       icon: "⭐",
+      path: "/admin/yorumlar",
     },
     {
       title: "Site Yönetimi",
       icon: "🖼️",
+      path: "/admin/site-yonetimi",
     },
     {
       title: "E-posta / Bildirimler",
       icon: "📧",
+      path: "/admin/bildirimler",
     },
     {
       title: "Ayarlar",
       icon: "⚙️",
+      path: "/admin/ayarlar",
     },
   ];
 
@@ -226,6 +245,7 @@ export default function AdminPage() {
 
           <div className="px-7 py-6 border-b border-white/10">
             <div className="flex items-center gap-3">
+
               <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center font-extrabold">
                 EO
               </div>
@@ -239,30 +259,37 @@ export default function AdminPage() {
                   Yönetim Paneli
                 </div>
               </div>
+
             </div>
           </div>
 
           <nav className="flex-1 px-4 py-5 space-y-1 overflow-y-auto">
 
-            {menuItems.map((item) => (
-              <button
-                key={item.title}
-                type="button"
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition ${
-                  item.active
-                    ? "bg-blue-600 text-white"
-                    : "text-slate-300 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <span className="text-lg">
-                  {item.icon}
-                </span>
+            {menuItems.map((item) => {
+              const isActive =
+                item.path === "/admin";
 
-                <span className="text-sm font-semibold">
-                  {item.title}
-                </span>
-              </button>
-            ))}
+              return (
+                <button
+                  key={item.title}
+                  type="button"
+                  onClick={() => router.push(item.path)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition ${
+                    isActive
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-300 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <span className="text-lg">
+                    {item.icon}
+                  </span>
+
+                  <span className="text-sm font-semibold">
+                    {item.title}
+                  </span>
+                </button>
+              );
+            })}
 
           </nav>
 
@@ -423,21 +450,33 @@ export default function AdminPage() {
                   <QuickButton
                     icon="🎫"
                     title="Etkinlik Ekle"
+                    onClick={() =>
+                      router.push("/admin/etkinlikler?new=1")
+                    }
                   />
 
                   <QuickButton
                     icon="📅"
                     title="Rezervasyonlar"
+                    onClick={() =>
+                      router.push("/admin/rezervasyonlar")
+                    }
                   />
 
                   <QuickButton
                     icon="🚤"
                     title="Tedarikçiler"
+                    onClick={() =>
+                      router.push("/admin/tedarikciler")
+                    }
                   />
 
                   <QuickButton
                     icon="🖼️"
                     title="Siteyi Düzenle"
+                    onClick={() =>
+                      router.push("/admin/site-yonetimi")
+                    }
                   />
 
                 </div>
@@ -524,13 +563,16 @@ function StatCard({
 function QuickButton({
   icon,
   title,
+  onClick,
 }: {
   icon: string;
   title: string;
+  onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition text-left"
     >
       <span className="text-xl">
