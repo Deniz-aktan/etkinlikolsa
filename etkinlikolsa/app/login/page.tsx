@@ -2,9 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "../../lib/supabase";
 
-export default function StaffLoginPage() {
+export default function LoginPage() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -30,7 +30,6 @@ export default function StaffLoginPage() {
     setLoading(true);
 
     try {
-      // 1. Supabase Auth ile giriş yap
       const { error: loginError } =
         await supabase.auth.signInWithPassword({
           email: cleanEmail,
@@ -43,55 +42,13 @@ export default function StaffLoginPage() {
         return;
       }
 
-      // 2. Giriş yapan kullanıcının rolünü güvenli RPC üzerinden al
-      const {
-        data: role,
-        error: roleError,
-      } = await supabase.rpc("current_user_role");
-
-      if (roleError || !role) {
-        await supabase.auth.signOut();
-
-        setError(
-          "Hesap yetkileri alınamadı. Lütfen sistem yöneticisiyle iletişime geçin."
-        );
-        setLoading(false);
-        return;
-      }
-
-      // 3. Role göre doğru panele gönder
-      if (role === "admin" || role === "super_admin") {
-        setSuccess(
-          "Yönetici girişi başarılı. Admin paneline yönlendiriliyorsunuz..."
-        );
-
-        setTimeout(() => {
-          router.replace("/admin");
-        }, 500);
-
-        return;
-      }
-
-      if (role === "supplier") {
-        setSuccess(
-          "Tedarikçi girişi başarılı. Panelinize yönlendiriliyorsunuz..."
-        );
-
-        setTimeout(() => {
-          router.replace("/tedarikci");
-        }, 500);
-
-        return;
-      }
-
-      // 4. Normal müşteri bu ekrandan giriş yapamaz
-      await supabase.auth.signOut();
-
-      setError(
-        "Bu hesap tedarikçi veya yönetici hesabı değil. Müşteri girişi için normal giriş ekranını kullanın."
+      setSuccess(
+        "Giriş başarılı. Hesabınıza yönlendiriliyorsunuz..."
       );
 
-      setLoading(false);
+      setTimeout(() => {
+        router.replace("/hesabim");
+      }, 700);
     } catch {
       setError("Beklenmeyen bir hata oluştu.");
       setLoading(false);
@@ -121,7 +78,7 @@ export default function StaffLoginPage() {
 
       if (resetError) {
         setError(
-          "Şifre yenileme bağlantısı gönderilemedi. E-posta adresini kontrol edin."
+          "Şifre yenileme bağlantısı gönderilemedi. Lütfen e-posta adresinizi kontrol edin."
         );
         setLoading(false);
         return;
@@ -150,11 +107,11 @@ export default function StaffLoginPage() {
             </div>
 
             <h1 className="text-2xl font-extrabold text-slate-900">
-              EtkinlikOlsa
+              Hoş Geldiniz
             </h1>
 
             <p className="text-slate-500 mt-2">
-              Tedarikçi & Yönetici Girişi
+              EtkinlikOlsa hesabınıza giriş yapın
             </p>
           </div>
 
@@ -227,12 +184,19 @@ export default function StaffLoginPage() {
             </button>
           </form>
 
-          {/* Bilgi */}
-          <div className="mt-7 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-center">
-            <p className="text-xs leading-5 text-slate-500">
-              Bu alan yalnızca EtkinlikOlsa yönetici ve tedarikçi
-              hesapları içindir.
+          {/* Kayıt */}
+          <div className="mt-7 text-center">
+            <p className="text-sm text-slate-500">
+              Henüz hesabınız yok mu?
             </p>
+
+            <button
+              type="button"
+              onClick={() => router.push("/register")}
+              className="mt-2 text-sm font-bold text-blue-600 hover:text-blue-700"
+            >
+              Hesap Oluştur
+            </button>
           </div>
 
           {/* Ana sayfa */}
@@ -245,6 +209,7 @@ export default function StaffLoginPage() {
               ← Ana sayfaya dön
             </button>
           </div>
+
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-5">
