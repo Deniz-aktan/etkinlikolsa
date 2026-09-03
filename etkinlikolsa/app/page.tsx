@@ -1423,9 +1423,9 @@ export default function Home() {
 
       {/* ================= FOOTER ================= */}
 
-      <footer className="bg-slate-950 py-12 text-white">
+      <footer className="bg-slate-950 py-14 text-white">
 
-        <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 md:flex-row md:items-center md:justify-between lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 md:grid-cols-3 lg:px-8">
 
           <div>
 
@@ -1435,16 +1435,81 @@ export default function Home() {
               </span>
             </div>
 
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-3 max-w-sm text-sm leading-6 text-slate-400">
               Özel anlarınızı unutulmaz kılıyoruz.
             </p>
 
           </div>
 
-          <div className="text-sm text-slate-400">
-            © 2026 EtkinlikOlsa. Tüm hakları saklıdır.
+          <div>
+            <h3 className="font-bold text-white">
+              EtkinlikOlsa
+            </h3>
+
+            <div className="mt-4 flex flex-col gap-3 text-sm text-slate-400">
+              <button
+                onClick={scrollToEvents}
+                className="w-fit hover:text-white"
+              >
+                Etkinlikler
+              </button>
+
+              <button
+                onClick={() =>
+                  document
+                    .getElementById("nasil-calisir")
+                    ?.scrollIntoView({
+                      behavior: "smooth",
+                    })
+                }
+                className="w-fit hover:text-white"
+              >
+                Nasıl Çalışır?
+              </button>
+
+              <button
+                onClick={() =>
+                  document
+                    .getElementById("yorumlar")
+                    ?.scrollIntoView({
+                      behavior: "smooth",
+                    })
+                }
+                className="w-fit hover:text-white"
+              >
+                Yorumlar
+              </button>
+            </div>
           </div>
 
+          <div>
+            <h3 className="font-bold text-white">
+              İş Ortakları
+            </h3>
+
+            <div className="mt-4 flex flex-col gap-3 text-sm">
+              <button
+                onClick={() => {
+                  window.location.href = "/tedarikci/login";
+                }}
+                className="w-fit font-semibold text-blue-400 hover:text-blue-300"
+              >
+                Tedarikçi Girişi
+              </button>
+
+              <p className="max-w-xs leading-6 text-slate-400">
+                Etkinliğinizi platformumuza eklemek ve rezervasyonlarınızı yönetmek için tedarikçi paneline giriş yapın.
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        <div className="mx-auto mt-10 max-w-7xl border-t border-white/10 px-5 pt-6 lg:px-8">
+          <div className="flex flex-col gap-3 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
+            <span>© 2026 EtkinlikOlsa. Tüm hakları saklıdır.</span>
+            <span>Güvenli ve kolay etkinlik rezervasyonu</span>
+          </div>
         </div>
 
       </footer>
