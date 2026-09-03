@@ -7,95 +7,136 @@ import { supabase } from "../../../lib/supabase";
 export default function StaffLoginPage() {
   const router = useRouter();
 
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
 
     setError("");
+    setSuccess("");
 
-    const loginUsername = username.trim();
+    const cleanEmail = email.trim().toLowerCase();
 
-    if (!loginUsername || !password) {
-      setError("Kullanıcı adı ve şifreyi girin.");
+    if (!cleanEmail || !password) {
+      setError("Lütfen e-posta ve şifrenizi girin.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const { data: email, error: emailError } = await supabase.rpc(
-        "get_staff_email",
-        {
-          login_username: loginUsername,
-        }
-      );
-
-      if (emailError || !email) {
-        setError("Kullanıcı adı veya şifre hatalı.");
-        setLoading(false);
-        return;
-      }
-
+      // Supabase Auth ile giriş
       const { error: loginError } =
         await supabase.auth.signInWithPassword({
-          email,
+          email: cleanEmail,
           password,
         });
 
       if (loginError) {
-        setError("Kullanıcı adı veya şifre hatalı.");
+        setError("E-posta veya şifre hatalı.");
         setLoading(false);
         return;
       }
 
+      // Kullanıcının rolünü Supabase'den al
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: role,
+        error: roleError,
+      } = await supabase.rpc("current_user_role");
 
-      if (!user) {
-        setError("Giriş sırasında bir sorun oluştu.");
+      if (roleError || !role) {
         await supabase.auth.signOut();
+
+        setError(
+          "Hesap yetkileri alınamadı. Lütfen sistem yöneticisiyle iletişime geçin."
+        );
+
         setLoading(false);
         return;
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
+      // Admin
+      if (role === "admin" || role === "super_admin") {
+        setSuccess(
+          "Yönetici girişi başarılı. Admin paneline yönlendiriliyorsunuz..."
+        );
 
-      if (profileError || !profile) {
-        setError("Hesap yetkileri alınamadı.");
-        await supabase.auth.signOut();
-        setLoading(false);
+        setTimeout(() => {
+          router.replace("/admin");
+        }, 500);
+
         return;
       }
 
-      if (
-        profile.role === "admin" ||
-        profile.role === "super_admin"
-      ) {
-        router.replace("/admin");
+      // Tedarikçi
+      if (role === "supplier") {
+        setSuccess(
+          "Tedarikçi girişi başarılı. Panelinize yönlendiriliyorsunuz..."
+        );
+
+        setTimeout(() => {
+          router.replace("/tedarikci");
+        }, 500);
+
         return;
       }
 
-      if (profile.role === "supplier") {
-        router.replace("/tedarikci");
-        return;
-      }
-
+      // Normal müşteri bu ekrandan giremez
       await supabase.auth.signOut();
 
-      setError("Bu hesap tedarikçi veya yetkili hesabı değil.");
+      setError(
+        "Bu hesap tedarikçi veya yönetici hesabı değil. Müşteri girişi için normal giriş ekranını kullanın."
+      );
+
       setLoading(false);
     } catch {
       setError("Beklenmeyen bir hata oluştu.");
+      setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setError("");
+    setSuccess("");
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      setError(
+        "Şifre yenileme bağlantısı için önce e-posta adresinizi girin."
+      );
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error: resetError } =
+        await supabase.auth.resetPasswordForEmail(cleanEmail, {
+          redirectTo: `${window.location.origin}/sifre-yenile`,
+        });
+
+      if (resetError) {
+        setError(
+          "Şifre yenileme bağlantısı gönderilemedi. E-posta adresini kontrol edin."
+        );
+
+        setLoading(false);
+        return;
+      }
+
+      setSuccess(
+        "Şifre yenileme bağlantısı e-posta adresinize gönderildi."
+      );
+
+      setLoading(false);
+    } catch {
+      setError("Şifre yenileme sırasında bir hata oluştu.");
       setLoading(false);
     }
   }
@@ -105,8 +146,9 @@ export default function StaffLoginPage() {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-8 md:p-10">
 
+          {/* Logo */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 text-white text-xl font-extrabold mb-4">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white text-xl font-extrabold mb-4">
               EO
             </div>
 
@@ -115,48 +157,70 @@ export default function StaffLoginPage() {
             </h1>
 
             <p className="text-slate-500 mt-2">
-              Tedarikçi Girişi
+              Tedarikçi & Yönetici Girişi
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
 
+            {/* E-posta */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Kullanıcı adı
+                E-posta
               </label>
 
               <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Kullanıcı adınız"
-                autoComplete="username"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="ornek@email.com"
+                autoComplete="email"
                 className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
               />
             </div>
 
+            {/* Şifre */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Şifre
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-semibold text-slate-700">
+                  Şifre
+                </label>
+
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={loading}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                >
+                  Şifremi unuttum
+                </button>
+              </div>
 
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Şifreniz"
+                placeholder="Şifrenizi girin"
                 autoComplete="current-password"
                 className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
               />
             </div>
 
+            {/* Hata */}
             {error && (
               <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
                 {error}
               </div>
             )}
 
+            {/* Başarı */}
+            {success && (
+              <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
+                {success}
+              </div>
+            )}
+
+            {/* Giriş */}
             <button
               type="submit"
               disabled={loading}
@@ -166,14 +230,16 @@ export default function StaffLoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-4">
-            <p className="text-xs text-slate-500 text-center leading-5">
-              Bu alan EtkinlikOlsa tedarikçi ve yetkili
+          {/* Bilgi */}
+          <div className="mt-7 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-center">
+            <p className="text-xs leading-5 text-slate-500">
+              Bu alan yalnızca EtkinlikOlsa yönetici ve tedarikçi
               hesapları içindir.
             </p>
           </div>
 
-          <div className="mt-6 text-center">
+          {/* Ana sayfa */}
+          <div className="mt-5 text-center">
             <button
               type="button"
               onClick={() => router.push("/")}
@@ -185,7 +251,7 @@ export default function StaffLoginPage() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-5">
-          EtkinlikOlsa Tedarikçi Sistemi
+          EtkinlikOlsa
         </p>
       </div>
     </main>
