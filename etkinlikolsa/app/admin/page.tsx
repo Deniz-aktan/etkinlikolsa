@@ -47,16 +47,13 @@ export default function AdminPage() {
       return;
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    const { data: role, error: roleError } =
+      await supabase.rpc("current_user_role");
 
     if (
-      profileError ||
-      !profile ||
-      !["admin", "super_admin"].includes(profile.role)
+      roleError ||
+      !role ||
+      !["admin", "super_admin"].includes(role)
     ) {
       await supabase.auth.signOut();
       router.replace("/tedarikci/login");
