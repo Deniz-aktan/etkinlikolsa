@@ -759,10 +759,12 @@ export default function Home() {
             </button>
 
             <button
-              onClick={() => setReservationOpen(true)}
+              onClick={() => {
+                window.location.href = "/login";
+              }}
               className="rounded-full bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700"
             >
-              Teklif Al
+              Giriş Yap
             </button>
 
           </div>
@@ -800,8 +802,13 @@ export default function Home() {
                 Nasıl Çalışır?
               </button>
 
-              <button onClick={() => setReservationOpen(true)}>
-                Teklif Al
+              <button
+                onClick={() => {
+                  window.location.href = "/login";
+                }}
+                className="font-semibold text-blue-600"
+              >
+                Giriş Yap
               </button>
 
             </div>
