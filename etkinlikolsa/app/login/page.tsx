@@ -2,9 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "../../../lib/supabase";
 
-export default function LoginPage() {
+export default function StaffLoginPage() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -29,23 +29,73 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    const { error: loginError } =
-      await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password,
-      });
+    try {
+      // 1. Supabase Auth ile giriş yap
+      const { error: loginError } =
+        await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
 
-    if (loginError) {
-      setError("E-posta veya şifre hatalı.");
+      if (loginError) {
+        setError("E-posta veya şifre hatalı.");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Giriş yapan kullanıcının rolünü güvenli RPC üzerinden al
+      const {
+        data: role,
+        error: roleError,
+      } = await supabase.rpc("current_user_role");
+
+      if (roleError || !role) {
+        await supabase.auth.signOut();
+
+        setError(
+          "Hesap yetkileri alınamadı. Lütfen sistem yöneticisiyle iletişime geçin."
+        );
+        setLoading(false);
+        return;
+      }
+
+      // 3. Role göre doğru panele gönder
+      if (role === "admin" || role === "super_admin") {
+        setSuccess(
+          "Yönetici girişi başarılı. Admin paneline yönlendiriliyorsunuz..."
+        );
+
+        setTimeout(() => {
+          router.replace("/admin");
+        }, 500);
+
+        return;
+      }
+
+      if (role === "supplier") {
+        setSuccess(
+          "Tedarikçi girişi başarılı. Panelinize yönlendiriliyorsunuz..."
+        );
+
+        setTimeout(() => {
+          router.replace("/tedarikci");
+        }, 500);
+
+        return;
+      }
+
+      // 4. Normal müşteri bu ekrandan giriş yapamaz
+      await supabase.auth.signOut();
+
+      setError(
+        "Bu hesap tedarikçi veya yönetici hesabı değil. Müşteri girişi için normal giriş ekranını kullanın."
+      );
+
       setLoading(false);
-      return;
+    } catch {
+      setError("Beklenmeyen bir hata oluştu.");
+      setLoading(false);
     }
-
-    setSuccess("Giriş başarılı. Hesabınıza yönlendiriliyorsunuz...");
-
-    setTimeout(() => {
-      router.push("/hesabim");
-    }, 700);
   }
 
   async function handleForgotPassword() {
@@ -55,28 +105,37 @@ export default function LoginPage() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail) {
-      setError("Şifre yenileme bağlantısı için önce e-posta adresinizi girin.");
+      setError(
+        "Şifre yenileme bağlantısı için önce e-posta adresinizi girin."
+      );
       return;
     }
 
     setLoading(true);
 
-    const { error: resetError } =
-      await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: `${window.location.origin}/sifre-yenile`,
-      });
+    try {
+      const { error: resetError } =
+        await supabase.auth.resetPasswordForEmail(cleanEmail, {
+          redirectTo: `${window.location.origin}/sifre-yenile`,
+        });
 
-    if (resetError) {
-      setError("Şifre yenileme bağlantısı gönderilemedi.");
+      if (resetError) {
+        setError(
+          "Şifre yenileme bağlantısı gönderilemedi. E-posta adresini kontrol edin."
+        );
+        setLoading(false);
+        return;
+      }
+
+      setSuccess(
+        "Şifre yenileme bağlantısı e-posta adresinize gönderildi."
+      );
+
       setLoading(false);
-      return;
+    } catch {
+      setError("Şifre yenileme sırasında bir hata oluştu.");
+      setLoading(false);
     }
-
-    setSuccess(
-      "Şifre yenileme bağlantısı e-posta adresinize gönderildi."
-    );
-
-    setLoading(false);
   }
 
   return (
@@ -91,11 +150,11 @@ export default function LoginPage() {
             </div>
 
             <h1 className="text-2xl font-extrabold text-slate-900">
-              Hoş Geldiniz
+              EtkinlikOlsa
             </h1>
 
             <p className="text-slate-500 mt-2">
-              EtkinlikOlsa hesabınıza giriş yapın
+              Tedarikçi & Yönetici Girişi
             </p>
           </div>
 
@@ -168,19 +227,12 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Kayıt */}
-          <div className="mt-7 text-center">
-            <p className="text-sm text-slate-500">
-              Henüz hesabınız yok mu?
+          {/* Bilgi */}
+          <div className="mt-7 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-center">
+            <p className="text-xs leading-5 text-slate-500">
+              Bu alan yalnızca EtkinlikOlsa yönetici ve tedarikçi
+              hesapları içindir.
             </p>
-
-            <button
-              type="button"
-              onClick={() => router.push("/register")}
-              className="mt-2 text-sm font-bold text-blue-600 hover:text-blue-700"
-            >
-              Hesap Oluştur
-            </button>
           </div>
 
           {/* Ana sayfa */}
