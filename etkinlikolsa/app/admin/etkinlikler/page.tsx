@@ -1,6 +1,11 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 
@@ -14,6 +19,7 @@ type EventItem = {
   duration: string | null;
   description: string | null;
   image_url: string | null;
+  gallery: string[] | null;
   active: boolean;
   created_at: string;
 };
@@ -64,18 +70,30 @@ export default function EventsAdminPage() {
   const [editingEvent, setEditingEvent] =
     useState<EventItem | null>(null);
 
-  const [form, setForm] = useState<FormData>(emptyForm);
+  const [form, setForm] =
+    useState<FormData>(emptyForm);
 
-  const [selectedFile, setSelectedFile] =
+  // ANA GÖRSEL
+  const [mainFile, setMainFile] =
     useState<File | null>(null);
 
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [mainPreview, setMainPreview] =
+    useState("");
+
+  // EK GÖRSELLER
+  const [galleryFiles, setGalleryFiles] =
+    useState<File[]>([]);
+
+  const [galleryPreviews, setGalleryPreviews] =
+    useState<string[]>([]);
+
+  // Mevcut galerideki görseller
+  const [existingGallery, setExistingGallery] =
+    useState<string[]>([]);
 
   useEffect(() => {
     checkAdminAndLoad();
 
-    // Dashboard'dan "?new=1" ile gelindiyse
-    // yeni etkinlik penceresini aç.
     if (
       typeof window !== "undefined" &&
       window.location.search.includes("new=1")
@@ -104,7 +122,9 @@ export default function EventsAdminPage() {
       const {
         data: role,
         error: roleError,
-      } = await supabase.rpc("current_user_role");
+      } = await supabase.rpc(
+        "current_user_role"
+      );
 
       if (
         roleError ||
@@ -137,7 +157,7 @@ export default function EventsAdminPage() {
     } = await supabase
       .from("events")
       .select(
-        "id,title,category,location,price,capacity,duration,description,image_url,active,created_at"
+        "id,title,category,location,price,capacity,duration,description,image_url,gallery,active,created_at"
       )
       .order("created_at", {
         ascending: false,
@@ -161,6 +181,16 @@ export default function EventsAdminPage() {
     );
   }
 
+  function resetImages() {
+    setMainFile(null);
+    setMainPreview("");
+
+    setGalleryFiles([]);
+    setGalleryPreviews([]);
+
+    setExistingGallery([]);
+  }
+
   function openNewEvent() {
     setEditingEvent(null);
 
@@ -168,8 +198,7 @@ export default function EventsAdminPage() {
       ...emptyForm,
     });
 
-    setSelectedFile(null);
-    setPreviewUrl("");
+    resetImages();
 
     setError("");
     setSuccess("");
@@ -186,20 +215,33 @@ export default function EventsAdminPage() {
       title: event.title || "",
       category: event.category || "",
       location: event.location || "",
-      price: String(event.price ?? ""),
+      price: String(
+        event.price ?? ""
+      ),
       capacity:
         event.capacity !== null &&
         event.capacity !== undefined
           ? String(event.capacity)
           : "",
-      duration: event.duration || "",
+      duration:
+        event.duration || "",
       description:
         event.description || "",
     });
 
-    setSelectedFile(null);
-    setPreviewUrl(
+    setMainFile(null);
+
+    setMainPreview(
       event.image_url || ""
+    );
+
+    setGalleryFiles([]);
+    setGalleryPreviews([]);
+
+    setExistingGallery(
+      Array.isArray(event.gallery)
+        ? event.gallery
+        : []
     );
 
     setError("");
@@ -218,57 +260,7 @@ export default function EventsAdminPage() {
       ...emptyForm,
     });
 
-    setSelectedFile(null);
-    setPreviewUrl("");
-  }
-
-  function handleFileChange(
-    event: ChangeEvent<HTMLInputElement>
-  ) {
-    const file =
-      event.target.files?.[0];
-
-    if (!file) return;
-
-    setError("");
-
-    const allowedTypes = [
-      "image/png",
-      "image/jpeg",
-      "image/webp",
-    ];
-
-    if (
-      !allowedTypes.includes(
-        file.type
-      )
-    ) {
-      setError(
-        "Sadece PNG, JPG, JPEG veya WEBP görsel yükleyebilirsin."
-      );
-
-      event.target.value = "";
-      return;
-    }
-
-    const maxSize =
-      10 * 1024 * 1024;
-
-    if (file.size > maxSize) {
-      setError(
-        "Görsel boyutu en fazla 10 MB olabilir."
-      );
-
-      event.target.value = "";
-      return;
-    }
-
-    setSelectedFile(file);
-
-    const objectUrl =
-      URL.createObjectURL(file);
-
-    setPreviewUrl(objectUrl);
+    resetImages();
   }
 
   function updateForm(
@@ -280,6 +272,160 @@ export default function EventsAdminPage() {
       [field]: value,
     }));
   }
+
+  // =====================================================
+  // ANA GÖRSEL
+  // =====================================================
+
+  function handleMainFileChange(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const file =
+      event.target.files?.[0];
+
+    if (!file) return;
+
+    setError("");
+
+    if (
+      ![
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+      ].includes(file.type)
+    ) {
+      setError(
+        "Ana görsel sadece PNG, JPG, JPEG veya WEBP olabilir."
+      );
+
+      event.target.value = "";
+      return;
+    }
+
+    if (
+      file.size >
+      10 * 1024 * 1024
+    ) {
+      setError(
+        "Ana görsel en fazla 10 MB olabilir."
+      );
+
+      event.target.value = "";
+      return;
+    }
+
+    setMainFile(file);
+
+    const preview =
+      URL.createObjectURL(file);
+
+    setMainPreview(preview);
+  }
+
+  // =====================================================
+  // EK GÖRSELLER
+  // =====================================================
+
+  function handleGalleryFileChange(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const files = Array.from(
+      event.target.files || []
+    );
+
+    if (files.length === 0) return;
+
+    setError("");
+
+    const allowedTypes = [
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+    ];
+
+    const invalidFile = files.find(
+      (file) =>
+        !allowedTypes.includes(
+          file.type
+        )
+    );
+
+    if (invalidFile) {
+      setError(
+        `"${invalidFile.name}" desteklenmeyen bir dosya türü. Sadece PNG, JPG, JPEG veya WEBP kullan.`
+      );
+
+      event.target.value = "";
+      return;
+    }
+
+    const tooLarge = files.find(
+      (file) =>
+        file.size >
+        10 * 1024 * 1024
+    );
+
+    if (tooLarge) {
+      setError(
+        `"${tooLarge.name}" dosyası 10 MB'dan büyük.`
+      );
+
+      event.target.value = "";
+      return;
+    }
+
+    setGalleryFiles((current) => [
+      ...current,
+      ...files,
+    ]);
+
+    const newPreviews =
+      files.map((file) =>
+        URL.createObjectURL(file)
+      );
+
+    setGalleryPreviews(
+      (current) => [
+        ...current,
+        ...newPreviews,
+      ]
+    );
+
+    event.target.value = "";
+  }
+
+  function removeNewGalleryImage(
+    index: number
+  ) {
+    setGalleryFiles(
+      (current) =>
+        current.filter(
+          (_, i) => i !== index
+        )
+    );
+
+    setGalleryPreviews(
+      (current) =>
+        current.filter(
+          (_, i) => i !== index
+        )
+    );
+  }
+
+  function removeExistingGalleryImage(
+    index: number
+  ) {
+    setExistingGallery(
+      (current) =>
+        current.filter(
+          (_, i) => i !== index
+        )
+    );
+  }
+
+  // =====================================================
+  // STORAGE UPLOAD
+  // =====================================================
 
   async function uploadImage(
     file: File
@@ -303,7 +449,10 @@ export default function EventsAdminPage() {
 
     const safeName =
       file.name
-        .replace(/\.[^/.]+$/, "")
+        .replace(
+          /\.[^/.]+$/,
+          ""
+        )
         .replace(
           /[^a-zA-Z0-9-_]/g,
           "-"
@@ -311,7 +460,9 @@ export default function EventsAdminPage() {
         .toLowerCase();
 
     const filePath =
-      `${user.id}/${Date.now()}-${safeName}.${extension}`;
+      `${user.id}/${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 8)}-${safeName}.${extension}`;
 
     const {
       error: uploadError,
@@ -359,6 +510,29 @@ export default function EventsAdminPage() {
     return data.publicUrl;
   }
 
+  async function uploadMultipleImages(
+    files: File[]
+  ) {
+    const urls: string[] = [];
+
+    for (
+      const file of files
+    ) {
+      const url =
+        await uploadImage(
+          file
+        );
+
+      urls.push(url);
+    }
+
+    return urls;
+  }
+
+  // =====================================================
+  // KAYDET
+  // =====================================================
+
   async function handleSubmit(
     event: FormEvent
   ) {
@@ -404,10 +578,14 @@ export default function EventsAdminPage() {
 
     if (form.capacity) {
       const capacity =
-        Number(form.capacity);
+        Number(
+          form.capacity
+        );
 
       if (
-        Number.isNaN(capacity) ||
+        Number.isNaN(
+          capacity
+        ) ||
         capacity < 1
       ) {
         setError(
@@ -419,10 +597,10 @@ export default function EventsAdminPage() {
 
     if (
       !editingEvent &&
-      !selectedFile
+      !mainFile
     ) {
       setError(
-        "Lütfen etkinlik görselini seç."
+        "Lütfen ana görseli seç."
       );
       return;
     }
@@ -430,17 +608,43 @@ export default function EventsAdminPage() {
     setSaving(true);
 
     try {
+      // =================================================
+      // ANA GÖRSELİ YÜKLE
+      // =================================================
+
       let imageUrl =
         editingEvent?.image_url ||
         null;
 
-      // Yeni görsel seçildiyse önce Storage'a yükle
-      if (selectedFile) {
+      if (mainFile) {
         imageUrl =
           await uploadImage(
-            selectedFile
+            mainFile
           );
       }
+
+      // =================================================
+      // YENİ GALERİ GÖRSELLERİNİ YÜKLE
+      // =================================================
+
+      let uploadedGallery: string[] =
+        [];
+
+      if (
+        galleryFiles.length >
+        0
+      ) {
+        uploadedGallery =
+          await uploadMultipleImages(
+            galleryFiles
+          );
+      }
+
+      // Mevcut + yeni galeriyi birleştir
+      const finalGallery = [
+        ...existingGallery,
+        ...uploadedGallery,
+      ];
 
       const payload = {
         title:
@@ -456,7 +660,9 @@ export default function EventsAdminPage() {
 
         capacity:
           form.capacity
-            ? Number(form.capacity)
+            ? Number(
+                form.capacity
+              )
             : null,
 
         duration:
@@ -470,17 +676,26 @@ export default function EventsAdminPage() {
         image_url:
           imageUrl,
 
+        gallery:
+          finalGallery,
+
         active:
           editingEvent?.active ??
           true,
       };
+
+      // =================================================
+      // GÜNCELLE
+      // =================================================
 
       if (editingEvent) {
         const {
           error: updateError,
         } = await supabase
           .from("events")
-          .update(payload)
+          .update(
+            payload
+          )
           .eq(
             "id",
             editingEvent.id
@@ -500,7 +715,13 @@ export default function EventsAdminPage() {
         setSuccess(
           "Etkinlik başarıyla güncellendi."
         );
-      } else {
+      }
+
+      // =================================================
+      // YENİ ETKİNLİK
+      // =================================================
+
+      else {
         const {
           error: insertError,
         } = await supabase
@@ -549,6 +770,10 @@ export default function EventsAdminPage() {
     }
   }
 
+  // =====================================================
+  // AKTİF / PASİF
+  // =====================================================
+
   async function toggleActive(
     event: EventItem
   ) {
@@ -583,6 +808,10 @@ export default function EventsAdminPage() {
 
     await loadEvents();
   }
+
+  // =====================================================
+  // SİL
+  // =====================================================
 
   async function deleteEvent(
     event: EventItem
@@ -623,9 +852,14 @@ export default function EventsAdminPage() {
     await loadEvents();
   }
 
+  // =====================================================
+  // LOADING
+  // =====================================================
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-100 flex items-center justify-center">
+
         <div className="text-center">
 
           <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-extrabold text-xl mx-auto mb-4">
@@ -637,9 +871,14 @@ export default function EventsAdminPage() {
           </p>
 
         </div>
+
       </main>
     );
   }
+
+  // =====================================================
+  // PAGE
+  // =====================================================
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -650,6 +889,7 @@ export default function EventsAdminPage() {
         <div className="max-w-7xl mx-auto px-5 lg:px-8 py-6 flex items-center justify-between">
 
           <div>
+
             <p className="text-sm text-slate-500">
               Yönetim Paneli
             </p>
@@ -657,6 +897,7 @@ export default function EventsAdminPage() {
             <h1 className="text-3xl font-extrabold text-slate-900 mt-1">
               Etkinlikler
             </h1>
+
           </div>
 
           <div className="flex items-center gap-3">
@@ -720,7 +961,7 @@ export default function EventsAdminPage() {
           </div>
         )}
 
-        {/* EVENTS */}
+        {/* EVENT LIST */}
         <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
 
           <div className="px-6 py-6 border-b border-slate-200">
@@ -738,6 +979,7 @@ export default function EventsAdminPage() {
           </div>
 
           {events.length === 0 ? (
+
             <div className="py-24 text-center">
 
               <div className="text-5xl mb-5">
@@ -764,11 +1006,14 @@ export default function EventsAdminPage() {
               </button>
 
             </div>
+
           ) : (
+
             <div className="divide-y divide-slate-100">
 
               {events.map(
                 (event) => (
+
                   <div
                     key={
                       event.id
@@ -780,6 +1025,7 @@ export default function EventsAdminPage() {
                     <div className="w-full md:w-40 h-28 rounded-2xl overflow-hidden bg-slate-100 flex-shrink-0">
 
                       {event.image_url ? (
+
                         <img
                           src={
                             event.image_url
@@ -789,10 +1035,13 @@ export default function EventsAdminPage() {
                           }
                           className="w-full h-full object-cover"
                         />
+
                       ) : (
+
                         <div className="w-full h-full flex items-center justify-center text-3xl">
                           🖼️
                         </div>
+
                       )}
 
                     </div>
@@ -837,6 +1086,20 @@ export default function EventsAdminPage() {
                             event.location
                           }
                         </span>
+
+                        {event.gallery &&
+                          event.gallery.length >
+                            0 && (
+                            <span>
+                              🖼️{" "}
+                              {
+                                event
+                                  .gallery
+                                  .length
+                              }{" "}
+                              ek görsel
+                            </span>
+                          )}
 
                       </div>
 
@@ -922,26 +1185,33 @@ export default function EventsAdminPage() {
                     </div>
 
                   </div>
+
                 )
               )}
 
             </div>
+
           )}
 
         </div>
 
       </div>
 
-      {/* MODAL */}
+      {/* =================================================
+          MODAL
+      ================================================= */}
+
       {modalOpen && (
+
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
 
-          <div className="bg-white w-full max-w-3xl max-h-[92vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="bg-white w-full max-w-4xl max-h-[94vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
 
             {/* MODAL HEADER */}
             <div className="px-6 md:px-8 py-5 border-b border-slate-200 flex items-center justify-between">
 
               <div>
+
                 <h2 className="text-2xl font-extrabold text-slate-900">
                   {editingEvent
                     ? "Etkinliği Düzenle"
@@ -949,8 +1219,10 @@ export default function EventsAdminPage() {
                 </h2>
 
                 <p className="text-sm text-slate-500 mt-1">
-                  Etkinlik bilgilerini doldur.
+                  Etkinlik bilgilerini ve görsellerini
+                  ekle.
                 </p>
+
               </div>
 
               <button
@@ -973,250 +1245,476 @@ export default function EventsAdminPage() {
               className="overflow-y-auto"
             >
 
-              <div className="p-6 md:p-8 space-y-6">
+              <div className="p-6 md:p-8 space-y-7">
 
+                {/* ERROR */}
                 {error && (
                   <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 break-words">
                     {error}
                   </div>
                 )}
 
-                {/* TITLE */}
+                {/* =================================================
+                    TEMEL BİLGİLER
+                ================================================= */}
+
                 <div>
 
-                  <label className="block text-sm font-bold text-slate-700 mb-2">
-                    Etkinlik Adı *
-                  </label>
+                  <h3 className="text-lg font-extrabold text-slate-900 mb-4">
+                    Temel Bilgiler
+                  </h3>
 
-                  <input
-                    type="text"
-                    value={
-                      form.title
-                    }
-                    onChange={(e) =>
-                      updateForm(
-                        "title",
-                        e.target.value
-                      )
-                    }
-                    placeholder="Örn. Boğazda Romantik Tekne Turu"
-                    className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  />
+                  <div className="space-y-5">
 
-                </div>
+                    {/* TITLE */}
+                    <div>
 
-                {/* CATEGORY LOCATION */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <label className="block text-sm font-bold text-slate-700 mb-2">
+                        Etkinlik Adı *
+                      </label>
 
-                  <div>
+                      <input
+                        type="text"
+                        value={
+                          form.title
+                        }
+                        onChange={(e) =>
+                          updateForm(
+                            "title",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Örn. Boğazda Romantik Tekne Turu"
+                        className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                      />
 
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                      Kategori *
-                    </label>
+                    </div>
 
-                    <select
-                      value={
-                        form.category
-                      }
-                      onChange={(e) =>
-                        updateForm(
-                          "category",
-                          e.target.value
-                        )
-                      }
-                      className="w-full h-12 rounded-xl border border-slate-300 px-4 bg-white outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                    >
+                    {/* CATEGORY + LOCATION */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-                      <option value="">
-                        Kategori seç
-                      </option>
+                      <div>
 
-                      {categories.map(
-                        (
-                          category
-                        ) => (
-                          <option
-                            key={
-                              category
-                            }
-                            value={
-                              category
-                            }
-                          >
-                            {
-                              category
-                            }
-                          </option>
-                        )
-                      )}
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          Kategori *
+                        </label>
 
-                    </select>
-
-                  </div>
-
-                  <div>
-
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                      Konum *
-                    </label>
-
-                    <input
-                      type="text"
-                      value={
-                        form.location
-                      }
-                      onChange={(e) =>
-                        updateForm(
-                          "location",
-                          e.target.value
-                        )
-                      }
-                      placeholder="Örn. İstanbul Boğazı"
-                      className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                    />
-
-                  </div>
-
-                </div>
-
-                {/* PRICE CAPACITY DURATION */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-
-                  <div>
-
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                      Fiyat (TL) *
-                    </label>
-
-                    <input
-                      type="number"
-                      min="0"
-                      value={
-                        form.price
-                      }
-                      onChange={(e) =>
-                        updateForm(
-                          "price",
-                          e.target.value
-                        )
-                      }
-                      placeholder="15000"
-                      className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                    />
-
-                  </div>
-
-                  <div>
-
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                      Kapasite
-                    </label>
-
-                    <input
-                      type="number"
-                      min="1"
-                      value={
-                        form.capacity
-                      }
-                      onChange={(e) =>
-                        updateForm(
-                          "capacity",
-                          e.target.value
-                        )
-                      }
-                      placeholder="20"
-                      className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                    />
-
-                  </div>
-
-                  <div>
-
-                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                      Süre
-                    </label>
-
-                    <input
-                      type="text"
-                      value={
-                        form.duration
-                      }
-                      onChange={(e) =>
-                        updateForm(
-                          "duration",
-                          e.target.value
-                        )
-                      }
-                      placeholder="2 saat"
-                      className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                    />
-
-                  </div>
-
-                </div>
-
-                {/* IMAGE UPLOAD */}
-                <div>
-
-                  <label className="block text-sm font-bold text-slate-700 mb-2">
-                    Etkinlik Görseli *
-                  </label>
-
-                  <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-5">
-
-                    {previewUrl && (
-                      <div className="mb-4">
-
-                        <img
-                          src={
-                            previewUrl
+                        <select
+                          value={
+                            form.category
                           }
-                          alt="Görsel önizleme"
-                          className="w-full h-64 object-cover rounded-xl"
+                          onChange={(e) =>
+                            updateForm(
+                              "category",
+                              e.target.value
+                            )
+                          }
+                          className="w-full h-12 rounded-xl border border-slate-300 px-4 bg-white outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                        >
+
+                          <option value="">
+                            Kategori seç
+                          </option>
+
+                          {categories.map(
+                            (
+                              category
+                            ) => (
+
+                              <option
+                                key={
+                                  category
+                                }
+                                value={
+                                  category
+                                }
+                              >
+                                {
+                                  category
+                                }
+                              </option>
+
+                            )
+                          )}
+
+                        </select>
+
+                      </div>
+
+                      <div>
+
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          Konum *
+                        </label>
+
+                        <input
+                          type="text"
+                          value={
+                            form.location
+                          }
+                          onChange={(e) =>
+                            updateForm(
+                              "location",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Örn. İstanbul Boğazı"
+                          className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                         />
 
                       </div>
+
+                    </div>
+
+                    {/* PRICE CAPACITY DURATION */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+                      <div>
+
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          Fiyat (TL) *
+                        </label>
+
+                        <input
+                          type="number"
+                          min="0"
+                          value={
+                            form.price
+                          }
+                          onChange={(e) =>
+                            updateForm(
+                              "price",
+                              e.target.value
+                            )
+                          }
+                          placeholder="15000"
+                          className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                        />
+
+                      </div>
+
+                      <div>
+
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          Kapasite
+                        </label>
+
+                        <input
+                          type="number"
+                          min="1"
+                          value={
+                            form.capacity
+                          }
+                          onChange={(e) =>
+                            updateForm(
+                              "capacity",
+                              e.target.value
+                            )
+                          }
+                          placeholder="20"
+                          className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                        />
+
+                      </div>
+
+                      <div>
+
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          Süre
+                        </label>
+
+                        <input
+                          type="text"
+                          value={
+                            form.duration
+                          }
+                          onChange={(e) =>
+                            updateForm(
+                              "duration",
+                              e.target.value
+                            )
+                          }
+                          placeholder="2 saat"
+                          className="w-full h-12 rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                        />
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* =================================================
+                    ANA GÖRSEL
+                ================================================= */}
+
+                <div>
+
+                  <h3 className="text-lg font-extrabold text-slate-900 mb-2">
+                    Ana Görsel
+                  </h3>
+
+                  <p className="text-sm text-slate-500 mb-4">
+                    Bu görsel etkinliğin kapak görseli
+                    olarak kullanılacak.
+                  </p>
+
+                  <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-5">
+
+                    {mainPreview && (
+
+                      <div className="relative mb-5">
+
+                        <img
+                          src={
+                            mainPreview
+                          }
+                          alt="Ana görsel önizleme"
+                          className="w-full h-72 object-cover rounded-xl"
+                        />
+
+                        {mainFile && (
+                          <div className="absolute left-3 bottom-3 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                            Yeni görsel
+                          </div>
+                        )}
+
+                      </div>
+
                     )}
 
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
                       onChange={
-                        handleFileChange
+                        handleMainFileChange
                       }
                       className="block w-full text-sm text-slate-600 file:mr-4 file:py-3 file:px-5 file:rounded-xl file:border-0 file:bg-blue-600 file:text-white file:font-bold hover:file:bg-blue-700 file:cursor-pointer"
                     />
 
                     <p className="text-xs text-slate-500 mt-3">
-                      PNG, JPG, JPEG veya
-                      WEBP • Maksimum
+                      PNG, JPG, JPEG veya WEBP • Maksimum
                       10 MB
                     </p>
 
-                    {selectedFile && (
+                    {mainFile && (
                       <p className="text-sm font-semibold text-green-600 mt-2">
                         ✓{" "}
                         {
-                          selectedFile.name
+                          mainFile.name
                         }
                       </p>
                     )}
-
-                    {!selectedFile &&
-                      editingEvent?.image_url && (
-                        <p className="text-xs text-slate-500 mt-2">
-                          Mevcut görsel
-                          kullanılacak. Yeni
-                          görsel seçersen
-                          değiştirilir.
-                        </p>
-                      )}
 
                   </div>
 
                 </div>
 
-                {/* DESCRIPTION */}
+                {/* =================================================
+                    EK GÖRSELLER
+                ================================================= */}
+
+                <div>
+
+                  <div className="flex items-end justify-between mb-2">
+
+                    <div>
+
+                      <h3 className="text-lg font-extrabold text-slate-900">
+                        Ek Görseller
+                      </h3>
+
+                      <p className="text-sm text-slate-500 mt-1">
+                        Etkinliğin diğer fotoğraflarını
+                        buradan ekleyebilirsin.
+                      </p>
+
+                    </div>
+
+                    <div className="text-sm font-bold text-slate-500">
+                      {existingGallery.length +
+                        galleryFiles.length}{" "}
+                      görsel
+                    </div>
+
+                  </div>
+
+                  <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-5">
+
+                    {/* EXISTING GALLERY */}
+                    {existingGallery.length >
+                      0 && (
+
+                      <div className="mb-6">
+
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+                          Mevcut Görseller
+                        </p>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+
+                          {existingGallery.map(
+                            (
+                              image,
+                              index
+                            ) => (
+
+                              <div
+                                key={
+                                  image +
+                                  index
+                                }
+                                className="relative aspect-square rounded-xl overflow-hidden bg-white border border-slate-200 group"
+                              >
+
+                                <img
+                                  src={
+                                    image
+                                  }
+                                  alt={`Ek görsel ${
+                                    index +
+                                    1
+                                  }`}
+                                  className="w-full h-full object-cover"
+                                />
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeExistingGalleryImage(
+                                      index
+                                    )
+                                  }
+                                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-600 text-white font-bold opacity-0 group-hover:opacity-100 transition shadow-lg"
+                                >
+                                  ×
+                                </button>
+
+                              </div>
+
+                            )
+                          )}
+
+                        </div>
+
+                      </div>
+
+                    )}
+
+                    {/* NEW GALLERY */}
+                    {galleryPreviews.length >
+                      0 && (
+
+                      <div className="mb-6">
+
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+                          Yeni Görseller
+                        </p>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+
+                          {galleryPreviews.map(
+                            (
+                              image,
+                              index
+                            ) => (
+
+                              <div
+                                key={
+                                  image
+                                }
+                                className="relative aspect-square rounded-xl overflow-hidden bg-white border border-green-200 group"
+                              >
+
+                                <img
+                                  src={
+                                    image
+                                  }
+                                  alt={`Yeni görsel ${
+                                    index +
+                                    1
+                                  }`}
+                                  className="w-full h-full object-cover"
+                                />
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeNewGalleryImage(
+                                      index
+                                    )
+                                  }
+                                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-600 text-white font-bold shadow-lg"
+                                >
+                                  ×
+                                </button>
+
+                                <div className="absolute left-2 bottom-2 bg-green-600 text-white px-2 py-1 rounded-md text-[10px] font-bold">
+                                  YENİ
+                                </div>
+
+                              </div>
+
+                            )
+                          )}
+
+                        </div>
+
+                      </div>
+
+                    )}
+
+                    {/* FILE INPUT */}
+                    <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
+
+                      <div className="text-3xl mb-2">
+                        📸
+                      </div>
+
+                      <p className="font-bold text-slate-800">
+                        Birden fazla görsel seç
+                      </p>
+
+                      <p className="text-xs text-slate-500 mt-1 mb-4">
+                        Ctrl tuşuna basılı tutarak birden
+                        fazla fotoğraf seçebilirsin.
+                      </p>
+
+                      <input
+                        id="gallery-upload"
+                        type="file"
+                        multiple
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={
+                          handleGalleryFileChange
+                        }
+                        className="hidden"
+                      />
+
+                      <label
+                        htmlFor="gallery-upload"
+                        className="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-blue-600 text-white font-bold cursor-pointer hover:bg-blue-700 transition"
+                      >
+                        + Ek Görseller Seç
+                      </label>
+
+                      <p className="text-xs text-slate-400 mt-3">
+                        PNG, JPG, JPEG veya WEBP • Her
+                        dosya maksimum 10 MB
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* =================================================
+                    AÇIKLAMA
+                ================================================= */}
+
                 <div>
 
                   <label className="block text-sm font-bold text-slate-700 mb-2">
@@ -1233,7 +1731,7 @@ export default function EventsAdminPage() {
                         e.target.value
                       )
                     }
-                    rows={5}
+                    rows={6}
                     placeholder="Etkinlik hakkında detaylı açıklama..."
                     className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none resize-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   />
@@ -1266,7 +1764,7 @@ export default function EventsAdminPage() {
                   className="px-7 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:bg-blue-400"
                 >
                   {saving
-                    ? "Kaydediliyor..."
+                    ? "Görseller yükleniyor..."
                     : editingEvent
                     ? "Değişiklikleri Kaydet"
                     : "Etkinliği Oluştur"}
