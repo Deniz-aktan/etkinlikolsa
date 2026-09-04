@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { CalendarDays, ChevronRight, LogOut, Settings, User, Bell, Heart, ShieldCheck, X } from "lucide-react";
 
@@ -42,17 +43,33 @@ export default function AccountPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
+    let mounted = true;
+    const SESSION_DURATION = 60 * 60 * 1000; // 1 saat
+
     async function loadAccount() {
       setLoading(true);
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData.user;
+      const { data: authData } = await supabase.auth.getSession();
+      const user = authData.session?.user;
 
       if (!user) {
-        window.location.href = "/login";
+        router.replace("/login");
         return;
       }
+
+      const lastSignIn = user.last_sign_in_at
+        ? new Date(user.last_sign_in_at).getTime()
+        : Date.now();
+
+      if (Date.now() - lastSignIn >= SESSION_DURATION) {
+        await supabase.auth.signOut();
+        router.replace("/login");
+        return;
+      }
+
+      if (!mounted) return;
 
       setEmail(user.email || "");
 
@@ -74,17 +91,23 @@ export default function AccountPage() {
         setError("Hesap bilgileri yüklenirken bir hata oluştu.");
       }
 
+      if (!mounted) return;
+
       setProfile(profileData);
       setReservations(reservationData || []);
       setLoading(false);
     }
 
     loadAccount();
-  }, []);
+
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
 
   async function logout() {
     await supabase.auth.signOut();
-    window.location.href = "/";
+    router.replace("/");
   }
 
   if (loading) {
@@ -95,14 +118,14 @@ export default function AccountPage() {
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-8">
-          <button onClick={() => (window.location.href = "/")} className="flex items-center gap-3">
+          <button onClick={() => (router.push("/"))} className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white">
               <CalendarDays size={23} />
             </div>
             <span className="text-xl font-extrabold tracking-tight">Etkinlik<span className="text-blue-600">Olsa</span></span>
           </button>
           <div className="flex items-center gap-3">
-            <button onClick={() => (window.location.href = "/")} className="hidden rounded-full px-4 py-2 font-semibold hover:bg-slate-100 sm:block">Anasayfa</button>
+            <button onClick={() => (router.push("/"))} className="hidden rounded-full px-4 py-2 font-semibold hover:bg-slate-100 sm:block">Anasayfa</button>
             <button onClick={logout} className="flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 font-semibold hover:bg-slate-50"><LogOut size={17} /> Çıkış Yap</button>
           </div>
         </div>
@@ -145,7 +168,7 @@ export default function AccountPage() {
             <section id="rezervasyonlar" className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
               <div className="mb-5 flex items-center gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><CalendarDays size={21} /></div><div><h2 className="text-xl font-black">Rezervasyonlarım</h2><p className="text-sm text-slate-500">Tüm rezervasyon geçmişin</p></div></div>
               {reservations.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center"><CalendarDays className="mx-auto text-slate-300" size={40} /><p className="mt-3 font-bold">Henüz rezervasyonun yok.</p><button onClick={() => (window.location.href = "/")} className="mt-4 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white">Etkinlikleri Keşfet</button></div>
+                <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center"><CalendarDays className="mx-auto text-slate-300" size={40} /><p className="mt-3 font-bold">Henüz rezervasyonun yok.</p><button onClick={() => (router.push("/"))} className="mt-4 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white">Etkinlikleri Keşfet</button></div>
               ) : (
                 <div className="space-y-3">
                   {reservations.map((reservation) => (
