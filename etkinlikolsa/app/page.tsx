@@ -92,6 +92,17 @@ export default function Home() {
   const [location, setLocation] = useState("İstanbul");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [reservationOpen, setReservationOpen] = useState(false);
+  const [reservationName, setReservationName] = useState("");
+  const [reservationPhone, setReservationPhone] = useState("");
+  const [reservationEmail, setReservationEmail] = useState("");
+  const [reservationDate, setReservationDate] = useState("");
+  const [reservationStartTime, setReservationStartTime] = useState("");
+  const [reservationEndTime, setReservationEndTime] = useState("");
+  const [reservationPeople, setReservationPeople] = useState("");
+  const [reservationMessage, setReservationMessage] = useState("");
+  const [reservationSubmitting, setReservationSubmitting] = useState(false);
+  const [reservationError, setReservationError] = useState("");
+  const [reservationSuccess, setReservationSuccess] = useState("");
   const [favorites, setFavorites] = useState<string[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -258,6 +269,9 @@ export default function Home() {
     setSelectedEvent(event);
     setSelectedImage(event.image);
     setSelectedAddons([]);
+    setReservationOpen(false);
+    setReservationError("");
+    setReservationSuccess("");
   }
 
   function closeEvent() {
@@ -1409,86 +1423,209 @@ export default function Home() {
 
       {/* ================= RESERVATION ================= */}
 
-      {reservationOpen && (
-
+      {reservationOpen && selectedEvent && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-
-          <div className="w-full max-w-lg rounded-3xl bg-white p-7 shadow-2xl">
-
+          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl">
             <div className="flex items-start justify-between">
-
               <div>
-
-                <p className="font-semibold text-blue-600">
-                  Rezervasyon
-                </p>
-
-                <h2 className="mt-1 text-2xl font-black">
-                  Teklifinizi oluşturalım
-                </h2>
-
+                <p className="font-semibold text-blue-600">Rezervasyon</p>
+                <h2 className="mt-1 text-2xl font-black">Rezervasyon talebi oluştur</h2>
+                <p className="mt-1 text-sm text-slate-500">{selectedEvent.title}</p>
               </div>
-
               <button
-                onClick={() =>
-                  setReservationOpen(false)
-                }
+                onClick={() => setReservationOpen(false)}
                 className="rounded-full bg-slate-100 p-2"
+                disabled={reservationSubmitting}
               >
                 <X size={19} />
               </button>
-
             </div>
 
-            <div className="mt-6 space-y-4">
+            {reservationSuccess ? (
+              <div className="mt-7 rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white">
+                  <Check size={25} />
+                </div>
+                <h3 className="mt-4 text-xl font-black text-slate-900">Rezervasyon talebiniz alındı</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Rezervasyonunuz hesabınıza kaydedildi. Admin ve ilgili tedarikçi panelinden incelenebilir.</p>
+                <button
+                  onClick={() => {
+                    setReservationOpen(false);
+                    setReservationSuccess("");
+                    closeEvent();
+                    router.push("/hesabim");
+                  }}
+                  className="mt-5 w-full rounded-2xl bg-blue-600 py-4 font-bold text-white hover:bg-blue-700"
+                >
+                  Rezervasyonlarımı Gör
+                </button>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-4">
+                {reservationError && (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+                    {reservationError}
+                  </div>
+                )}
 
-              <input
-                placeholder="Ad Soyad"
-                className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
-              />
+                <input
+                  value={reservationName}
+                  onChange={(e) => setReservationName(e.target.value)}
+                  placeholder="Ad Soyad"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
+                />
 
-              <input
-                placeholder="Telefon"
-                type="tel"
-                className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
-              />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <input
+                    value={reservationPhone}
+                    onChange={(e) => setReservationPhone(e.target.value)}
+                    placeholder="Telefon"
+                    type="tel"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
+                  />
+                  <input
+                    value={reservationEmail}
+                    onChange={(e) => setReservationEmail(e.target.value)}
+                    placeholder="E-posta"
+                    type="email"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
+                  />
+                </div>
 
-              <input
-                placeholder="E-posta"
-                type="email"
-                className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
-              />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">Tarih</label>
+                    <input
+                      value={reservationDate}
+                      onChange={(e) => setReservationDate(e.target.value)}
+                      min={new Date().toISOString().split("T")[0]}
+                      type="date"
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">Kişi sayısı</label>
+                    <input
+                      value={reservationPeople}
+                      onChange={(e) => setReservationPeople(e.target.value)}
+                      min="1"
+                      type="number"
+                      placeholder="Örn. 4"
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
 
-              <input
-                type="date"
-                className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
-              />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">Başlangıç saati</label>
+                    <input
+                      value={reservationStartTime}
+                      onChange={(e) => setReservationStartTime(e.target.value)}
+                      type="time"
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">Bitiş saati</label>
+                    <input
+                      value={reservationEndTime}
+                      onChange={(e) => setReservationEndTime(e.target.value)}
+                      type="time"
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
 
-              <textarea
-                placeholder="Etkinliğiniz hakkında bilgi..."
-                rows={4}
-                className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
-              />
+                <textarea
+                  value={reservationMessage}
+                  onChange={(e) => setReservationMessage(e.target.value)}
+                  placeholder="Etkinliğiniz hakkında eklemek istediğiniz bilgi..."
+                  rows={4}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none focus:border-blue-500"
+                />
 
-              <button
-                onClick={() => {
-                  alert(
-                    "Rezervasyon talebiniz alındı! Ekibimiz en kısa sürede sizinle iletişime geçecektir."
-                  );
+                <div className="rounded-2xl bg-blue-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-600">Rezervasyon tutarı</span>
+                    <span className="text-xl font-black text-blue-600">{price(totalPrice)}</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Ödeme şu aşamada alınmayacaktır. Bu sadece rezervasyon talebidir.</p>
+                </div>
 
-                  setReservationOpen(false);
-                }}
-                className="w-full rounded-2xl bg-blue-600 py-4 font-bold text-white hover:bg-blue-700"
-              >
-                Teklif Talebi Gönder
-              </button>
+                <button
+                  disabled={reservationSubmitting}
+                  onClick={async () => {
+                    setReservationError("");
 
-            </div>
+                    if (!isLoggedIn) {
+                      router.push("/login");
+                      return;
+                    }
 
+                    if (!reservationName.trim() || !reservationPhone.trim() || !reservationEmail.trim() || !reservationDate || !reservationStartTime || !reservationEndTime || !reservationPeople) {
+                      setReservationError("Lütfen zorunlu alanların tamamını doldurun.");
+                      return;
+                    }
+
+                    const peopleCount = Number(reservationPeople);
+                    if (!Number.isInteger(peopleCount) || peopleCount < 1) {
+                      setReservationError("Kişi sayısı en az 1 olmalıdır.");
+                      return;
+                    }
+
+                    if (reservationEndTime <= reservationStartTime) {
+                      setReservationError("Bitiş saati başlangıç saatinden sonra olmalıdır.");
+                      return;
+                    }
+
+                    setReservationSubmitting(true);
+
+                    try {
+                      const { data: sessionData } = await supabase.auth.getSession();
+                      if (!sessionData.session?.user) {
+                        router.push("/login");
+                        return;
+                      }
+
+                      const addonItems = selectedAddons.map((index) => ({
+                        name: addons[index].name,
+                        price: addons[index].price,
+                      }));
+
+                      const { data, error } = await supabase.rpc("create_reservation", {
+                        p_event_id: selectedEvent.id,
+                        p_customer_name: reservationName.trim(),
+                        p_phone: reservationPhone.trim(),
+                        p_email: reservationEmail.trim().toLowerCase(),
+                        p_event_date: reservationDate,
+                        p_start_time: reservationStartTime,
+                        p_end_time: reservationEndTime,
+                        p_people: peopleCount,
+                        p_total_price: totalPrice,
+                        p_message: reservationMessage.trim(),
+                        p_addons: addonItems,
+                      });
+
+                      if (error) throw error;
+
+                      console.log("Rezervasyon oluşturuldu:", data);
+                      setReservationSuccess("success");
+                    } catch (error: any) {
+                      console.error("Rezervasyon oluşturulamadı:", error);
+                      setReservationError(error?.message || "Rezervasyon oluşturulurken bir hata oluştu.");
+                    } finally {
+                      setReservationSubmitting(false);
+                    }
+                  }}
+                  className="w-full rounded-2xl bg-blue-600 py-4 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {reservationSubmitting ? "Rezervasyon oluşturuluyor..." : "Rezervasyon Talebi Gönder"}
+                </button>
+              </div>
+            )}
           </div>
-
         </div>
-
       )}
 
     </main>
