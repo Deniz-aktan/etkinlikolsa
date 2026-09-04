@@ -1,304 +1,178 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+import { CalendarDays, ChevronRight, LogOut, Settings, User, Bell, Heart, ShieldCheck, X } from "lucide-react";
 
 type Profile = {
-  id: string;
-  username: string;
   full_name: string | null;
   phone: string | null;
-  role: string;
-  marketing_consent: boolean;
+  marketing_consent: boolean | null;
+  privacy_notice_acknowledged: boolean | null;
+  terms_accepted: boolean | null;
 };
 
+type Reservation = {
+  id: string;
+  event_id: string | null;
+  customer_name: string | null;
+  event_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  people: number | null;
+  total_price: number | null;
+  status: string | null;
+  created_at: string;
+};
+
+function money(value: number | null) {
+  return new Intl.NumberFormat("tr-TR").format(Number(value || 0)) + " TL";
+}
+
+function statusLabel(status: string | null) {
+  if (status === "approved") return "Onaylandı";
+  if (status === "cancelled") return "İptal edildi";
+  if (status === "rejected") return "Reddedildi";
+  return "Bekliyor";
+}
+
 export default function AccountPage() {
-  const router = useRouter();
-
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [email, setEmail] = useState("");
-
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    async function loadAccount() {
+      setLoading(true);
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData.user;
+
+      if (!user) {
+        window.location.href = "/login";
+        return;
+      }
+
+      setEmail(user.email || "");
+
+      const [{ data: profileData, error: profileError }, { data: reservationData, error: reservationError }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("full_name, phone, marketing_consent, privacy_notice_acknowledged, terms_accepted")
+          .eq("id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("reservations")
+          .select("id, event_id, customer_name, event_date, start_time, end_time, people, total_price, status, created_at")
+          .eq("email", user.email || "")
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (profileError || reservationError) {
+        console.error(profileError || reservationError);
+        setError("Hesap bilgileri yüklenirken bir hata oluştu.");
+      }
+
+      setProfile(profileData);
+      setReservations(reservationData || []);
+      setLoading(false);
+    }
+
     loadAccount();
   }, []);
 
-  async function loadAccount() {
-    setLoading(true);
-    setError("");
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
-
-    setEmail(user.email || "");
-
-    const { data, error: profileError } = await supabase
-      .from("profiles")
-      .select(
-        "id, username, full_name, phone, role, marketing_consent"
-      )
-      .eq("id", user.id)
-      .single();
-
-    if (profileError) {
-      setError("Hesap bilgileriniz yüklenemedi.");
-      setLoading(false);
-      return;
-    }
-
-    setProfile(data);
-    setLoading(false);
-  }
-
-  async function handleLogout() {
-    setLoggingOut(true);
-
+  async function logout() {
     await supabase.auth.signOut();
-
-    router.replace("/");
+    window.location.href = "/";
   }
 
   if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto" />
-          <p className="mt-4 text-slate-500">
-            Hesabınız yükleniyor...
-          </p>
-        </div>
-      </main>
-    );
+    return <main className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-500">Hesabınız yükleniyor...</main>;
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
-          <button
-            onClick={() => router.push("/")}
-            className="flex items-center gap-3"
-          >
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-extrabold">
-              EO
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-8">
+          <button onClick={() => (window.location.href = "/")} className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white">
+              <CalendarDays size={23} />
             </div>
-
-            <span className="text-xl font-extrabold text-slate-900">
-              EtkinlikOlsa
-            </span>
+            <span className="text-xl font-extrabold tracking-tight">Etkinlik<span className="text-blue-600">Olsa</span></span>
           </button>
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push("/")}
-              className="hidden sm:block text-sm font-semibold text-slate-600 hover:text-blue-600"
-            >
-              Etkinliklere Dön
-            </button>
-
-            <button
-              onClick={handleLogout}
-              disabled={loggingOut}
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-semibold text-slate-700 transition"
-            >
-              {loggingOut ? "Çıkış..." : "Çıkış Yap"}
-            </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => (window.location.href = "/")} className="hidden rounded-full px-4 py-2 font-semibold hover:bg-slate-100 sm:block">Anasayfa</button>
+            <button onClick={logout} className="flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 font-semibold hover:bg-slate-50"><LogOut size={17} /> Çıkış Yap</button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-10">
-        <div className="mb-8">
-          <p className="text-sm font-semibold text-blue-600 mb-2">
-            HESABIM
-          </p>
+      <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
+        {error && <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
-          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900">
-            Hoş geldin, {profile?.full_name || "Değerli Üyemiz"} 👋
-          </h1>
-
-          <p className="text-slate-500 mt-2">
-            Rezervasyonlarını ve hesap bilgilerini buradan yönetebilirsin.
-          </p>
+        <div className="mb-8 rounded-3xl bg-gradient-to-r from-blue-600 to-blue-500 p-7 text-white shadow-lg">
+          <p className="text-sm font-semibold text-blue-100">Hesabım</p>
+          <h1 className="mt-2 text-3xl font-black">Merhaba, {profile?.full_name || "Hoş geldin"} 👋</h1>
+          <p className="mt-2 text-blue-100">Rezervasyonlarını ve hesap bilgilerini buradan yönetebilirsin.</p>
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 px-5 py-4 text-sm text-red-700">
-            {error}
+        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+          <aside className="h-fit rounded-3xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+            {[
+              [User, "Profilim", "#profil"],
+              [CalendarDays, "Rezervasyonlarım", "#rezervasyonlar"],
+              [Heart, "Favorilerim", "#favoriler"],
+              [Bell, "Bildirimler", "#bildirimler"],
+              [Settings, "Hesap Ayarları", "#ayarlar"],
+            ].map(([Icon, label, href]) => (
+              <a key={label as string} href={href as string} className="flex items-center justify-between rounded-2xl px-4 py-3.5 font-semibold hover:bg-slate-50">
+                <span className="flex items-center gap-3">{Icon && <Icon size={19} />} {label as string}</span><ChevronRight size={17} className="text-slate-400" />
+              </a>
+            ))}
+          </aside>
+
+          <div className="space-y-6">
+            <section id="profil" className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+              <div className="mb-5 flex items-center gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><User size={21} /></div><div><h2 className="text-xl font-black">Profilim</h2><p className="text-sm text-slate-500">Kişisel hesap bilgilerin</p></div></div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-400">Ad Soyad</p><p className="mt-1 font-bold">{profile?.full_name || "Belirtilmemiş"}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-400">E-posta</p><p className="mt-1 font-bold break-all">{email}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-400">Telefon</p><p className="mt-1 font-bold">{profile?.phone || "Belirtilmemiş"}</p></div>
+              </div>
+            </section>
+
+            <section id="rezervasyonlar" className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+              <div className="mb-5 flex items-center gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><CalendarDays size={21} /></div><div><h2 className="text-xl font-black">Rezervasyonlarım</h2><p className="text-sm text-slate-500">Tüm rezervasyon geçmişin</p></div></div>
+              {reservations.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center"><CalendarDays className="mx-auto text-slate-300" size={40} /><p className="mt-3 font-bold">Henüz rezervasyonun yok.</p><button onClick={() => (window.location.href = "/")} className="mt-4 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white">Etkinlikleri Keşfet</button></div>
+              ) : (
+                <div className="space-y-3">
+                  {reservations.map((reservation) => (
+                    <div key={reservation.id} className="rounded-2xl border border-slate-200 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div><p className="font-black">Rezervasyon #{reservation.id.slice(0, 8)}</p><p className="mt-1 text-sm text-slate-500">{reservation.event_date || "Tarih belirtilmemiş"}{reservation.start_time ? ` • ${reservation.start_time}` : ""} • {reservation.people || 0} kişi</p></div>
+                        <div className="flex items-center gap-3"><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">{statusLabel(reservation.status)}</span><span className="font-black">{money(reservation.total_price)}</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section id="favoriler" className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100"><h2 className="text-xl font-black">Favorilerim</h2><p className="mt-2 text-sm text-slate-500">Favoriler sistemini birazdan Supabase'e bağlayacağız. Burada favori etkinliklerin listelenecek.</p></section>
+            <section id="bildirimler" className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100"><h2 className="text-xl font-black">Bildirimler</h2><p className="mt-2 text-sm text-slate-500">Rezervasyon onayı, iptal ve yaklaşan etkinlik bildirimleri burada görünecek.</p></section>
+            <section id="ayarlar" className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+              <h2 className="text-xl font-black">Hesap Ayarları</h2>
+              <div className="mt-5 space-y-3">
+                <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4"><div><p className="font-bold">Pazarlama iletişimi</p><p className="text-sm text-slate-500">Kampanya ve fırsat e-postaları</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${profile?.marketing_consent ? "bg-green-50 text-green-700" : "bg-slate-200 text-slate-600"}`}>{profile?.marketing_consent ? "Açık" : "Kapalı"}</span></div>
+                <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4"><div><p className="font-bold">Gizlilik bildirimi</p><p className="text-sm text-slate-500">Bilgilendirme metni durumu</p></div><ShieldCheck size={20} className="text-green-600" /></div>
+                <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4"><div><p className="font-bold">Üyelik sözleşmesi</p><p className="text-sm text-slate-500">Üyelik kabul durumu</p></div><ShieldCheck size={20} className="text-green-600" /></div>
+              </div>
+            </section>
           </div>
-        )}
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Profil */}
-          <section className="lg:col-span-1 bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-            <h2 className="text-xl font-extrabold text-slate-900">
-              Profil Bilgilerim
-            </h2>
-
-            <div className="mt-6 space-y-5">
-              <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase">
-                  Ad Soyad
-                </p>
-
-                <p className="mt-1 font-semibold text-slate-800">
-                  {profile?.full_name || "-"}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase">
-                  E-posta
-                </p>
-
-                <p className="mt-1 font-semibold text-slate-800 break-all">
-                  {email || "-"}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase">
-                  Telefon
-                </p>
-
-                <p className="mt-1 font-semibold text-slate-800">
-                  {profile?.phone || "-"}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase">
-                  Kampanya Bildirimleri
-                </p>
-
-                <p className="mt-1 font-semibold">
-                  {profile?.marketing_consent ? (
-                    <span className="text-green-600">
-                      Açık
-                    </span>
-                  ) : (
-                    <span className="text-slate-500">
-                      Kapalı
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-7 pt-6 border-t border-slate-100">
-              <button
-                onClick={() => router.push("/hesabim/ayarlar")}
-                className="w-full h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
-              >
-                Hesap Ayarları
-              </button>
-            </div>
-          </section>
-
-          {/* Rezervasyonlar */}
-          <section className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900">
-                  Rezervasyonlarım
-                </h2>
-
-                <p className="text-sm text-slate-500 mt-1">
-                  Etkinlik rezervasyonlarını buradan takip edebilirsin.
-                </p>
-              </div>
-
-              <button
-                onClick={() => router.push("/")}
-                className="hidden sm:block px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition"
-              >
-                Etkinlik Keşfet
-              </button>
-            </div>
-
-            <div className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-              <div className="text-4xl mb-4">
-                📅
-              </div>
-
-              <h3 className="font-bold text-slate-800">
-                Henüz rezervasyonun yok
-              </h3>
-
-              <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
-                Hayalindeki etkinliği keşfet ve sana özel paketini
-                oluşturarak rezervasyon talebi oluştur.
-              </p>
-
-              <button
-                onClick={() => router.push("/")}
-                className="mt-5 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition"
-              >
-                Etkinlikleri Keşfet
-              </button>
-            </div>
-          </section>
         </div>
-
-        {/* Hızlı erişim */}
-        <section className="mt-6 grid md:grid-cols-3 gap-4">
-          <button
-            onClick={() => router.push("/")}
-            className="bg-white rounded-2xl border border-slate-200 p-5 text-left hover:border-blue-300 hover:shadow-sm transition"
-          >
-            <div className="text-2xl mb-3">🎉</div>
-
-            <h3 className="font-bold text-slate-900">
-              Etkinlikleri Keşfet
-            </h3>
-
-            <p className="text-sm text-slate-500 mt-1">
-              Sana uygun etkinlikleri bul.
-            </p>
-          </button>
-
-          <button
-            onClick={() => router.push("/hesabim/ayarlar")}
-            className="bg-white rounded-2xl border border-slate-200 p-5 text-left hover:border-blue-300 hover:shadow-sm transition"
-          >
-            <div className="text-2xl mb-3">⚙️</div>
-
-            <h3 className="font-bold text-slate-900">
-              Hesap Ayarları
-            </h3>
-
-            <p className="text-sm text-slate-500 mt-1">
-              Bilgilerini ve tercihlerini yönet.
-            </p>
-          </button>
-
-          <button
-            onClick={() => router.push("/")}
-            className="bg-white rounded-2xl border border-slate-200 p-5 text-left hover:border-blue-300 hover:shadow-sm transition"
-          >
-            <div className="text-2xl mb-3">❤️</div>
-
-            <h3 className="font-bold text-slate-900">
-              Favorilerim
-            </h3>
-
-            <p className="text-sm text-slate-500 mt-1">
-              Beğendiğin etkinliklere daha sonra ulaş.
-            </p>
-          </button>
-        </section>
-      </div>
+      </section>
     </main>
   );
 }
