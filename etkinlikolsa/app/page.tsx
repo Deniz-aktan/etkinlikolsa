@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 import {
   ArrowRight,
@@ -95,6 +96,85 @@ export default function Home() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    let mounted = true;
+    let logoutTimer: ReturnType<typeof setTimeout> | null = null;
+    const SESSION_DURATION = 60 * 60 * 1000; // 1 saat
+
+    function clearLogoutTimer() {
+      if (logoutTimer) {
+        clearTimeout(logoutTimer);
+        logoutTimer = null;
+      }
+    }
+
+    async function applySession(session: any) {
+      clearLogoutTimer();
+
+      if (!mounted) return;
+
+      const user = session?.user;
+
+      if (!user) {
+        setIsLoggedIn(false);
+        setAuthLoading(false);
+        return;
+      }
+
+      // Supabase'in otomatik token yenilemesi oturumu uzatabilir.
+      // Burada müşteri girişini son girişten itibaren en fazla 1 saat açık tutuyoruz.
+      const lastSignIn = user.last_sign_in_at
+        ? new Date(user.last_sign_in_at).getTime()
+        : Date.now();
+      const elapsed = Date.now() - lastSignIn;
+
+      if (elapsed >= SESSION_DURATION) {
+        await supabase.auth.signOut();
+        if (!mounted) return;
+        setIsLoggedIn(false);
+        setAuthLoading(false);
+        return;
+      }
+
+      setIsLoggedIn(true);
+      setAuthLoading(false);
+
+      logoutTimer = setTimeout(async () => {
+        await supabase.auth.signOut();
+      }, SESSION_DURATION - elapsed);
+    }
+
+    async function loadSession() {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        console.error("Oturum kontrolü hatası:", error);
+        if (mounted) {
+          setIsLoggedIn(false);
+          setAuthLoading(false);
+        }
+        return;
+      }
+
+      await applySession(data.session);
+    }
+
+    loadSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      void applySession(session);
+    });
+
+    return () => {
+      mounted = false;
+      clearLogoutTimer();
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     async function loadEvents() {
@@ -293,11 +373,12 @@ export default function Home() {
 
             <button
               onClick={() => {
-                window.location.href = "/login";
+                router.push(isLoggedIn ? "/hesabim" : "/login");
               }}
-              className="rounded-full bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700"
+              className="min-w-[110px] rounded-full bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700 disabled:opacity-70"
+              disabled={authLoading}
             >
-              Giriş Yap
+              {authLoading ? "" : isLoggedIn ? "Hesabım" : "Giriş Yap"}
             </button>
 
           </div>
@@ -337,11 +418,12 @@ export default function Home() {
 
               <button
                 onClick={() => {
-                  window.location.href = "/login";
+                  router.push(isLoggedIn ? "/hesabim" : "/login");
                 }}
                 className="font-semibold text-blue-600"
+                disabled={authLoading}
               >
-                Giriş Yap
+                {authLoading ? "" : isLoggedIn ? "Hesabım" : "Giriş Yap"}
               </button>
 
             </div>
