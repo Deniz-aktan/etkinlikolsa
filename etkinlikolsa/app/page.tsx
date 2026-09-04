@@ -33,6 +33,7 @@ type EventItem = {
   capacity: string;
   duration: string;
   image: string;
+  gallery: string[];
   description: string;
 };
 
@@ -83,6 +84,7 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("Tümü");
   const [searchCategory, setSearchCategory] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [selectedImage, setSelectedImage] = useState("");
   const [selectedAddons, setSelectedAddons] = useState<number[]>([]);
   const [date, setDate] = useState("");
   const [people, setPeople] = useState("");
@@ -102,7 +104,7 @@ export default function Home() {
       const { data, error } = await supabase
         .from("events")
         .select(
-          "id, title, category, location, price, capacity, duration, description, image_url, rating, review_count, active"
+          "id, title, category, location, price, capacity, duration, description, image_url, gallery, rating, review_count, active"
         )
         .eq("active", true)
         .order("created_at", { ascending: false });
@@ -128,6 +130,9 @@ export default function Home() {
         image:
           event.image_url ||
           "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=85&w=1400&auto=format&fit=crop",
+        gallery: Array.isArray(event.gallery)
+          ? event.gallery.filter((image: unknown): image is string => typeof image === "string" && image.length > 0)
+          : [],
         description: event.description ?? "",
       }));
 
@@ -171,11 +176,13 @@ export default function Home() {
 
   function openEvent(event: EventItem) {
     setSelectedEvent(event);
+    setSelectedImage(event.image);
     setSelectedAddons([]);
   }
 
   function closeEvent() {
     setSelectedEvent(null);
+    setSelectedImage("");
     setSelectedAddons([]);
   }
 
@@ -652,7 +659,8 @@ export default function Home() {
 
                 <div
                   key={event.id}
-                  className="group overflow-hidden rounded-3xl bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+                  onClick={() => openEvent(event)}
+                  className="group cursor-pointer overflow-hidden rounded-3xl bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
                 >
 
                   <div className="relative h-64 overflow-hidden">
@@ -664,15 +672,16 @@ export default function Home() {
                     />
 
                     <button
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setFavorites((current) =>
                           current.includes(event.id)
                             ? current.filter(
                                 (id) => id !== event.id
                               )
                             : [...current, event.id]
-                        )
-                      }
+                        );
+                      }}
                       className="absolute right-4 top-4 rounded-full bg-white/95 p-3 shadow-lg"
                     >
                       <Heart
@@ -741,7 +750,10 @@ export default function Home() {
                       </div>
 
                       <button
-                        onClick={() => openEvent(event)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEvent(event);
+                        }}
                         className="flex items-center gap-2 rounded-full bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
                       >
                         İncele
@@ -1063,7 +1075,7 @@ export default function Home() {
             <div className="relative">
 
               <img
-                src={selectedEvent.image}
+                src={selectedImage || selectedEvent.image}
                 alt={selectedEvent.title}
                 className="h-72 w-full object-cover md:h-96"
               />
@@ -1076,6 +1088,37 @@ export default function Home() {
               </button>
 
             </div>
+
+            {selectedEvent.gallery.length > 0 && (
+              <div className="border-b border-slate-100 bg-white px-6 py-5 md:px-9">
+                <div className="mb-3 text-sm font-bold text-slate-700">
+                  Etkinlik Fotoğrafları
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-1">
+                  {[selectedEvent.image, ...selectedEvent.gallery]
+                    .filter((image, index, array) => image && array.indexOf(image) === index)
+                    .map((image) => (
+                      <button
+                        key={image}
+                        type="button"
+                        onClick={() => setSelectedImage(image)}
+                        className={`relative h-20 w-28 shrink-0 overflow-hidden rounded-xl border-2 transition ${
+                          selectedImage === image
+                            ? "border-blue-600 ring-2 ring-blue-100"
+                            : "border-slate-200 hover:border-blue-300"
+                        }`}
+                      >
+                        <img
+                          src={image}
+                          alt={selectedEvent.title}
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+
 
             <div className="grid md:grid-cols-[1fr_380px]">
 
