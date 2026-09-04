@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../lib/supabase";
 import {
   ArrowRight,
   Calendar,
@@ -22,7 +23,7 @@ import {
 } from "lucide-react";
 
 type EventItem = {
-  id: number;
+  id: string;
   title: string;
   category: string;
   location: string;
@@ -46,528 +47,6 @@ const categories = [
   "Özel Günler",
 ];
 
-const events: EventItem[] = [
-
-  // =====================================================
-  // TEKNE & YAT
-  // =====================================================
-
-  {
-    id: 1,
-    title: "Princess 52 Özel Yat",
-    category: "Tekne & Yat",
-    location: "Bebek",
-    price: 18500,
-    rating: 4.9,
-    reviews: 128,
-    capacity: "2-30 kişi",
-    duration: "2 saat",
-    image:
-      "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "İstanbul Boğazı'nda size özel Princess 52 yatıyla unutulmaz bir deneyim.",
-  },
-
-  {
-    id: 2,
-    title: "Azimut 50 Lüks Yat",
-    category: "Tekne & Yat",
-    location: "İstinye",
-    price: 22000,
-    rating: 4.8,
-    reviews: 96,
-    capacity: "2-25 kişi",
-    duration: "2 saat",
-    image:
-      "https://images.unsplash.com/photo-1540946485063-a40da27545f8?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Lüks ve konforlu Azimut 50 ile Boğaz'ın eşsiz manzarasını keşfedin.",
-  },
-
-  {
-    id: 3,
-    title: "Boğaz Gün Batımı Teknesi",
-    category: "Tekne & Yat",
-    location: "Ortaköy",
-    price: 15000,
-    rating: 4.9,
-    reviews: 154,
-    capacity: "2-20 kişi",
-    duration: "2 saat",
-    image:
-      "https://images.unsplash.com/photo-1601918774946-25832a4be0d6?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Gün batımında sevdiklerinizle romantik ve huzurlu bir Boğaz turu.",
-  },
-
-  {
-    id: 4,
-    title: "Sea Ray 45 Özel Tekne",
-    category: "Tekne & Yat",
-    location: "Kuruçeşme",
-    price: 17000,
-    rating: 4.8,
-    reviews: 82,
-    capacity: "2-18 kişi",
-    duration: "2 saat",
-    image:
-      "https://images.unsplash.com/photo-1566847438217-76e82d383f84?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Arkadaş grupları ve çiftler için özel kiralanabilen modern tekne.",
-  },
-
-  {
-    id: 5,
-    title: "Mega Yat Boğaz Turu",
-    category: "Tekne & Yat",
-    location: "Bebek",
-    price: 35000,
-    rating: 5.0,
-    reviews: 47,
-    capacity: "10-60 kişi",
-    duration: "4 saat",
-    image:
-      "https://images.unsplash.com/photo-1562281302-809108fd533c?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Kalabalık gruplar ve özel kutlamalar için geniş ve lüks yat deneyimi.",
-  },
-
-  {
-    id: 6,
-    title: "Boğaz'da Kahvaltı Teknesi",
-    category: "Tekne & Yat",
-    location: "Arnavutköy",
-    price: 12000,
-    rating: 4.9,
-    reviews: 74,
-    capacity: "2-15 kişi",
-    duration: "2 saat",
-    image:
-      "https://images.unsplash.com/photo-1544550285-f813152fb2fd?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Boğaz manzarasında özel kahvaltı ve tekne keyfi.",
-  },
-
-  {
-    id: 7,
-    title: "Doğum Günü Özel Yat",
-    category: "Tekne & Yat",
-    location: "Kabataş",
-    price: 19500,
-    rating: 4.8,
-    reviews: 91,
-    capacity: "8-30 kişi",
-    duration: "3 saat",
-    image:
-      "https://images.unsplash.com/photo-1530789253388-582c481c54b0?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Doğum günü kutlamaları için özel hazırlanmış yat organizasyonu.",
-  },
-
-  {
-    id: 8,
-    title: "Özel Yemekli Boğaz Turu",
-    category: "Tekne & Yat",
-    location: "Üsküdar",
-    price: 16500,
-    rating: 4.9,
-    reviews: 63,
-    capacity: "2-20 kişi",
-    duration: "3 saat",
-    image:
-      "https://images.unsplash.com/photo-1500375592092-40eb2168fd21?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Özel menü eşliğinde Boğaz'ın ışıkları altında unutulmaz akşam.",
-  },
-
-
-  // =====================================================
-  // EVLİLİK TEKLİFİ
-  // =====================================================
-
-  {
-    id: 9,
-    title: "Boğaz'da Romantik Evlilik Teklifi",
-    category: "Evlilik Teklifi",
-    location: "Bebek",
-    price: 9500,
-    rating: 4.9,
-    reviews: 87,
-    capacity: "2 kişi",
-    duration: "2 saat",
-    image:
-      "https://images.unsplash.com/photo-1519741497674-611481863552?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Hayatınızın en önemli sorusunu Boğaz'ın eşsiz manzarasında sorun.",
-  },
-
-  {
-    id: 10,
-    title: "Gün Batımında Evlilik Teklifi",
-    category: "Evlilik Teklifi",
-    location: "Ortaköy",
-    price: 11500,
-    rating: 5.0,
-    reviews: 62,
-    capacity: "2 kişi",
-    duration: "2 saat",
-    image:
-      "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Gün batımında romantik masa, çiçekler ve özel dekorasyon.",
-  },
-
-  {
-    id: 11,
-    title: "Lüks Yatta Evlilik Teklifi",
-    category: "Evlilik Teklifi",
-    location: "Kuruçeşme",
-    price: 18000,
-    rating: 4.9,
-    reviews: 51,
-    capacity: "2 kişi",
-    duration: "3 saat",
-    image:
-      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Özel yat, romantik dekorasyon, müzik ve fotoğraf hizmeti.",
-  },
-
-  {
-    id: 12,
-    title: "Teras'ta Evlilik Teklifi",
-    category: "Evlilik Teklifi",
-    location: "Sarıyer",
-    price: 13500,
-    rating: 4.8,
-    reviews: 44,
-    capacity: "2-6 kişi",
-    duration: "3 saat",
-    image:
-      "https://images.unsplash.com/photo-1520854221256-17451cc331bf?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Boğaz manzaralı özel terasta romantik evlilik teklifi.",
-  },
-
-
-  // =====================================================
-  // DOĞUM GÜNÜ
-  // =====================================================
-
-  {
-    id: 13,
-    title: "Lüks Doğum Günü Organizasyonu",
-    category: "Doğum Günü",
-    location: "Beşiktaş",
-    price: 7500,
-    rating: 4.8,
-    reviews: 73,
-    capacity: "5-20 kişi",
-    duration: "3 saat",
-    image:
-      "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Dekorasyon, pasta ve özel konsept seçenekleriyle doğum günü.",
-  },
-
-  {
-    id: 14,
-    title: "Yatta Doğum Günü Partisi",
-    category: "Doğum Günü",
-    location: "Bebek",
-    price: 19500,
-    rating: 4.9,
-    reviews: 91,
-    capacity: "8-30 kişi",
-    duration: "3 saat",
-    image:
-      "https://images.unsplash.com/photo-1566847438217-76e82d383f84?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Arkadaş grubunuzla özel yatta doğum günü kutlaması.",
-  },
-
-  {
-    id: 15,
-    title: "Çocuk Doğum Günü Konsepti",
-    category: "Doğum Günü",
-    location: "Kadıköy",
-    price: 6500,
-    rating: 4.8,
-    reviews: 56,
-    capacity: "10-25 kişi",
-    duration: "3 saat",
-    image:
-      "https://images.unsplash.com/photo-1464349153735-7db50ed83c84?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Çocuklara özel renkli dekorasyon, pasta ve eğlence konsepti.",
-  },
-
-  {
-    id: 16,
-    title: "Villa Doğum Günü",
-    category: "Doğum Günü",
-    location: "Sarıyer",
-    price: 16000,
-    rating: 4.9,
-    reviews: 42,
-    capacity: "10-40 kişi",
-    duration: "5 saat",
-    image:
-      "https://images.unsplash.com/photo-1507504031003-b417219a0fde?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Özel villa, havuz ve dekorasyonla doğum günü organizasyonu.",
-  },
-
-
-  // =====================================================
-  // PARTİ & KUTLAMA
-  // =====================================================
-
-  {
-    id: 17,
-    title: "Yat Kiralama ile Parti",
-    category: "Parti & Kutlama",
-    location: "Kuruçeşme",
-    price: 18500,
-    rating: 4.8,
-    reviews: 102,
-    capacity: "10-30 kişi",
-    duration: "4 saat",
-    image:
-      "https://images.unsplash.com/photo-1566847438217-76e82d383f84?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Arkadaşlarınızla özel yatınızda müzik ve eğlence dolu parti.",
-  },
-
-  {
-    id: 18,
-    title: "Bekarlığa Veda Partisi",
-    category: "Parti & Kutlama",
-    location: "Bebek",
-    price: 16000,
-    rating: 4.9,
-    reviews: 58,
-    capacity: "8-25 kişi",
-    duration: "4 saat",
-    image:
-      "https://images.unsplash.com/photo-1519671482749-fbf85f3e9d6f?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Arkadaş grubunuzla unutulmaz bekarlığa veda gecesi.",
-  },
-
-  {
-    id: 19,
-    title: "Havuz Başı Parti",
-    category: "Parti & Kutlama",
-    location: "Sarıyer",
-    price: 14000,
-    rating: 4.8,
-    reviews: 48,
-    capacity: "10-40 kişi",
-    duration: "5 saat",
-    image:
-      "https://images.unsplash.com/photo-1501426026826-31c667bdf23d?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Yaz ayları için havuz başında özel parti organizasyonu.",
-  },
-
-  {
-    id: 20,
-    title: "Teras Parti Konsepti",
-    category: "Parti & Kutlama",
-    location: "Beşiktaş",
-    price: 11000,
-    rating: 4.7,
-    reviews: 35,
-    capacity: "10-35 kişi",
-    duration: "4 saat",
-    image:
-      "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Şehir manzaralı terasta arkadaş grubunuz için özel parti.",
-  },
-
-
-  // =====================================================
-  // ROMANTİK DENEYİMLER
-  // =====================================================
-
-  {
-    id: 21,
-    title: "Romantik Akşam Yemeği",
-    category: "Romantik Deneyimler",
-    location: "Ortaköy",
-    price: 8500,
-    rating: 4.9,
-    reviews: 61,
-    capacity: "2 kişi",
-    duration: "2 saat",
-    image:
-      "https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Özel masa düzeni ve Boğaz manzarası eşliğinde romantik akşam.",
-  },
-
-  {
-    id: 22,
-    title: "Çiftlere Özel Boğaz Turu",
-    category: "Romantik Deneyimler",
-    location: "Üsküdar",
-    price: 7500,
-    rating: 4.9,
-    reviews: 48,
-    capacity: "2 kişi",
-    duration: "2 saat",
-    image:
-      "https://images.unsplash.com/photo-1530789253388-582c481c54b0?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Sevgilinizle baş başa özel Boğaz turu.",
-  },
-
-  {
-    id: 23,
-    title: "Yıldönümü Sürprizi",
-    category: "Romantik Deneyimler",
-    location: "Bebek",
-    price: 10500,
-    rating: 5.0,
-    reviews: 39,
-    capacity: "2 kişi",
-    duration: "3 saat",
-    image:
-      "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Yıldönümünüz için özel masa, çiçek ve romantik atmosfer.",
-  },
-
-
-  // =====================================================
-  // KURUMSAL
-  // =====================================================
-
-  {
-    id: 24,
-    title: "Kurumsal Tekne Organizasyonu",
-    category: "Kurumsal",
-    location: "Karaköy",
-    price: 25000,
-    rating: 4.7,
-    reviews: 39,
-    capacity: "20-60 kişi",
-    duration: "4 saat",
-    image:
-      "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Şirket yemekleri, ekip etkinlikleri ve kurumsal davetler.",
-  },
-
-  {
-    id: 25,
-    title: "Kurumsal Akşam Yemeği",
-    category: "Kurumsal",
-    location: "Beşiktaş",
-    price: 18000,
-    rating: 4.8,
-    reviews: 31,
-    capacity: "15-50 kişi",
-    duration: "3 saat",
-    image:
-      "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Şirket ekipleri için özel yemek ve organizasyon hizmeti.",
-  },
-
-  {
-    id: 26,
-    title: "Şirket Motivasyon Etkinliği",
-    category: "Kurumsal",
-    location: "Sarıyer",
-    price: 32000,
-    rating: 4.9,
-    reviews: 27,
-    capacity: "20-80 kişi",
-    duration: "6 saat",
-    image:
-      "https://images.unsplash.com/photo-1556761175-b413da4baf72?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Ekip motivasyonu, eğlence ve özel aktivitelerle kurumsal etkinlik.",
-  },
-
-
-  // =====================================================
-  // NİŞAN & SÖZ
-  // =====================================================
-
-  {
-    id: 27,
-    title: "Nişan Organizasyonu",
-    category: "Nişan & Söz",
-    location: "Kadıköy",
-    price: 18000,
-    rating: 4.8,
-    reviews: 44,
-    capacity: "20-80 kişi",
-    duration: "5 saat",
-    image:
-      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Dekorasyon, masa düzeni, müzik ve fotoğraf hizmetleriyle nişan.",
-  },
-
-  {
-    id: 28,
-    title: "Söz Merasimi Konsepti",
-    category: "Nişan & Söz",
-    location: "Üsküdar",
-    price: 12500,
-    rating: 4.9,
-    reviews: 29,
-    capacity: "10-40 kişi",
-    duration: "4 saat",
-    image:
-      "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Şık dekorasyon ve masa düzeniyle özel söz organizasyonu.",
-  },
-
-
-  // =====================================================
-  // ÖZEL GÜNLER
-  // =====================================================
-
-  {
-    id: 29,
-    title: "Baby Shower Konsepti",
-    category: "Özel Günler",
-    location: "Bakırköy",
-    price: 9000,
-    rating: 4.9,
-    reviews: 36,
-    capacity: "10-30 kişi",
-    duration: "3 saat",
-    image:
-      "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Özel dekorasyon ve konsept seçenekleriyle baby shower.",
-  },
-
-  {
-    id: 30,
-    title: "Mezuniyet Kutlaması",
-    category: "Özel Günler",
-    location: "Beşiktaş",
-    price: 10500,
-    rating: 4.8,
-    reviews: 41,
-    capacity: "10-40 kişi",
-    duration: "4 saat",
-    image:
-      "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=85&w=1400&auto=format&fit=crop",
-    description:
-      "Mezuniyetinizi arkadaşlarınızla birlikte özel bir organizasyonla kutlayın.",
-  },
-
-];
 const addons = [
   {
     name: "Balon Süslemesi",
@@ -610,7 +89,54 @@ export default function Home() {
   const [location, setLocation] = useState("İstanbul");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [reservationOpen, setReservationOpen] = useState(false);
-  const [favorites, setFavorites] = useState<number[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState("");
+
+  useEffect(() => {
+    async function loadEvents() {
+      setEventsLoading(true);
+      setEventsError("");
+
+      const { data, error } = await supabase
+        .from("events")
+        .select(
+          "id, title, category, location, price, capacity, duration, description, image_url, rating, review_count, active"
+        )
+        .eq("active", true)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Etkinlikler yüklenemedi:", error);
+        setEventsError("Etkinlikler şu anda yüklenemiyor. Lütfen sayfayı yenileyin.");
+        setEvents([]);
+        setEventsLoading(false);
+        return;
+      }
+
+      const mappedEvents: EventItem[] = (data ?? []).map((event) => ({
+        id: String(event.id),
+        title: event.title ?? "",
+        category: event.category ?? "",
+        location: event.location ?? "",
+        price: Number(event.price ?? 0),
+        rating: Number(event.rating ?? 0),
+        reviews: Number(event.review_count ?? 0),
+        capacity: `${event.capacity ?? 0} kişi`,
+        duration: event.duration ?? "",
+        image:
+          event.image_url ||
+          "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=85&w=1400&auto=format&fit=crop",
+        description: event.description ?? "",
+      }));
+
+      setEvents(mappedEvents);
+      setEventsLoading(false);
+    }
+
+    loadEvents();
+  }, []);
 
   const filteredEvents = useMemo(() => {
     let result = events;
@@ -628,7 +154,7 @@ export default function Home() {
     }
 
     return result;
-  }, [selectedCategory, searchCategory]);
+  }, [events, selectedCategory, searchCategory]);
 
   const totalPrice =
     (selectedEvent?.price || 0) +
@@ -1081,7 +607,19 @@ export default function Home() {
 
           </div>
 
-          {filteredEvents.length === 0 ? (
+          {eventsError && (
+            <div className="mb-6 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-medium text-red-600">
+              {eventsError}
+            </div>
+          )}
+
+          {eventsLoading ? (
+            <div className="rounded-3xl bg-white p-16 text-center">
+              <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
+              <h3 className="text-xl font-bold">Etkinlikler yükleniyor...</h3>
+              <p className="mt-2 text-slate-500">Size uygun etkinlikleri getiriyoruz.</p>
+            </div>
+          ) : filteredEvents.length === 0 ? (
 
             <div className="rounded-3xl bg-white p-16 text-center">
 
