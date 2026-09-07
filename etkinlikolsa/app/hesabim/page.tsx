@@ -17,6 +17,7 @@ import {
 type Profile = {
   full_name: string | null;
   phone: string | null;
+  role: string | null;
   marketing_consent: boolean | null;
   privacy_notice_acknowledged: boolean | null;
   terms_accepted: boolean | null;
@@ -76,7 +77,7 @@ export default function AccountPage() {
   useEffect(() => {
     let mounted = true;
 
-    const SESSION_DURATION = 60 * 60 * 1000;
+    const SESSION_DURATION = 60 * 60 * 1000; // 1 saat
 
     async function loadAccount() {
       setLoading(true);
@@ -85,11 +86,13 @@ export default function AccountPage() {
       const { data: authData } = await supabase.auth.getSession();
       const user = authData.session?.user;
 
+      // Giriş yapılmamışsa login sayfasına gönder
       if (!user) {
         router.replace("/login");
         return;
       }
 
+      // 1 saatlik oturum kontrolü
       const lastSignIn = user.last_sign_in_at
         ? new Date(user.last_sign_in_at).getTime()
         : Date.now();
@@ -104,6 +107,7 @@ export default function AccountPage() {
 
       setEmail(user.email || "");
 
+      // Profil + rezervasyonları birlikte çek
       const [
         { data: profileData, error: profileError },
         { data: reservationData, error: reservationError },
@@ -111,16 +115,15 @@ export default function AccountPage() {
         supabase
           .from("profiles")
           .select(
-            "full_name, phone, marketing_consent, privacy_notice_acknowledged, terms_accepted"
+            "full_name, phone, role, marketing_consent, privacy_notice_acknowledged, terms_accepted"
           )
           .eq("id", user.id)
           .maybeSingle(),
 
         /*
          * ÖNEMLİ:
-         * Rezervasyon artık e-posta üzerinden değil,
-         * doğrudan giriş yapan kullanıcının ID'si üzerinden
-         * getiriliyor.
+         * Rezervasyonlar artık e-posta ile değil,
+         * doğrudan customer_id üzerinden kullanıcıya bağlanıyor.
          */
         supabase
           .from("reservations")
@@ -133,12 +136,32 @@ export default function AccountPage() {
 
       if (profileError || reservationError) {
         console.error(profileError || reservationError);
+
         setError(
           "Hesap bilgileri veya rezervasyonlar yüklenirken bir hata oluştu."
         );
       }
 
       if (!mounted) return;
+
+      /*
+       * TEK GİRİŞ SİSTEMİ
+       *
+       * Admin müşteri hesabına düşmez.
+       * Tedarikçi müşteri hesabına düşmez.
+       */
+      if (
+        profileData?.role === "admin" ||
+        profileData?.role === "super_admin"
+      ) {
+        router.replace("/admin");
+        return;
+      }
+
+      if (profileData?.role === "supplier") {
+        router.replace("/tedarikci");
+        return;
+      }
 
       setProfile(profileData);
       setReservations(reservationData || []);
@@ -167,6 +190,7 @@ export default function AccountPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
+      {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-8">
           <button
@@ -201,6 +225,7 @@ export default function AccountPage() {
         </div>
       </header>
 
+      {/* CONTENT */}
       <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
         {error && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -208,6 +233,7 @@ export default function AccountPage() {
           </div>
         )}
 
+        {/* WELCOME */}
         <div className="mb-8 rounded-3xl bg-gradient-to-r from-blue-600 to-blue-500 p-7 text-white shadow-lg">
           <p className="text-sm font-semibold text-blue-100">
             Hesabım
@@ -223,6 +249,7 @@ export default function AccountPage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+          {/* SIDEBAR */}
           <aside className="h-fit rounded-3xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
             {[
               [User, "Profilim", "#profil"],
@@ -337,7 +364,8 @@ export default function AccountPage() {
                   </p>
 
                   <p className="mt-1 text-sm text-slate-500">
-                    Beğendiğin bir etkinlik için hemen rezervasyon oluşturabilirsin.
+                    Beğendiğin bir etkinlik için hemen rezervasyon
+                    oluşturabilirsin.
                   </p>
 
                   <button
@@ -355,10 +383,12 @@ export default function AccountPage() {
                       className="rounded-2xl border border-slate-200 p-5"
                     >
                       <div className="flex flex-col gap-4">
+                        {/* ÜST BİLGİ */}
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="font-black">
-                              Rezervasyon #{reservation.id.slice(0, 8)}
+                              Rezervasyon #
+                              {reservation.id.slice(0, 8)}
                             </p>
 
                             <p className="mt-1 text-sm text-slate-500">
@@ -378,6 +408,7 @@ export default function AccountPage() {
                           </span>
                         </div>
 
+                        {/* DETAYLAR */}
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                           <div className="rounded-xl bg-slate-50 p-3">
                             <p className="text-xs font-semibold text-slate-400">
@@ -397,6 +428,7 @@ export default function AccountPage() {
 
                             <p className="mt-1 font-bold">
                               {reservation.start_time || "--:--"}
+
                               {reservation.end_time
                                 ? ` - ${reservation.end_time}`
                                 : ""}
@@ -424,18 +456,20 @@ export default function AccountPage() {
                           </div>
                         </div>
 
+                        {/* DURUM MESAJI */}
                         {reservation.status === "pending" && (
                           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                             Rezervasyonun admin tarafından
                             inceleniyor. Onaylandığında durum
-                            otomatik olarak burada güncellenecek.
+                            burada güncellenecek.
                           </div>
                         )}
 
                         {reservation.status === "approved" && (
                           <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
                             Rezervasyonun onaylandı. 🎉
-                            Etkinliğin için hazırlıklarını yapabilirsin.
+                            Etkinliğin için hazırlıklarını
+                            yapabilirsin.
                           </div>
                         )}
 
@@ -468,8 +502,9 @@ export default function AccountPage() {
               </h2>
 
               <p className="mt-2 text-sm text-slate-500">
-                Favoriler sistemini birazdan Supabase'e bağlayacağız.
-                Burada favori etkinliklerin listelenecek.
+                Favoriler sistemini birazdan Supabase'e
+                bağlayacağız. Burada favori etkinliklerin
+                listelenecek.
               </p>
             </section>
 
