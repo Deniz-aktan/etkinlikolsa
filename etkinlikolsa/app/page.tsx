@@ -109,6 +109,7 @@ export default function Home() {
   const [eventsError, setEventsError] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -132,6 +133,7 @@ export default function Home() {
 
       if (!user) {
         setIsLoggedIn(false);
+        setUserRole(null);
         setAuthLoading(false);
         return;
       }
@@ -147,10 +149,24 @@ export default function Home() {
         await supabase.auth.signOut();
         if (!mounted) return;
         setIsLoggedIn(false);
+        setUserRole(null);
         setAuthLoading(false);
         return;
       }
 
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("Rol kontrolü hatası:", profileError);
+      }
+
+      if (!mounted) return;
+
+      setUserRole(profileData?.role || "user");
       setIsLoggedIn(true);
       setAuthLoading(false);
 
@@ -166,6 +182,7 @@ export default function Home() {
         console.error("Oturum kontrolü hatası:", error);
         if (mounted) {
           setIsLoggedIn(false);
+          setUserRole(null);
           setAuthLoading(false);
         }
         return;
@@ -385,14 +402,46 @@ export default function Home() {
               <Heart size={21} />
             </button>
 
+            {!authLoading && !isLoggedIn && (
+              <button
+                onClick={() => router.push("/register")}
+                className="rounded-full border border-slate-200 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50"
+              >
+                Üye Ol
+              </button>
+            )}
+
             <button
               onClick={() => {
-                router.push(isLoggedIn ? "/hesabim" : "/login");
+                if (!isLoggedIn) {
+                  router.push("/login");
+                  return;
+                }
+
+                if (userRole === "admin" || userRole === "super_admin") {
+                  router.push("/admin");
+                  return;
+                }
+
+                if (userRole === "supplier") {
+                  router.push("/tedarikci");
+                  return;
+                }
+
+                router.push("/hesabim");
               }}
               className="min-w-[110px] rounded-full bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700 disabled:opacity-70"
               disabled={authLoading}
             >
-              {authLoading ? "" : isLoggedIn ? "Hesabım" : "Giriş Yap"}
+              {authLoading
+                ? ""
+                : !isLoggedIn
+                ? "Giriş Yap"
+                : userRole === "admin" || userRole === "super_admin"
+                ? "Yönetim Paneli"
+                : userRole === "supplier"
+                ? "Tedarikçi Paneli"
+                : "Hesabım"}
             </button>
 
           </div>
@@ -430,14 +479,46 @@ export default function Home() {
                 Nasıl Çalışır?
               </button>
 
+              {!authLoading && !isLoggedIn && (
+                <button
+                  onClick={() => router.push("/register")}
+                  className="font-semibold"
+                >
+                  Üye Ol
+                </button>
+              )}
+
               <button
                 onClick={() => {
-                  router.push(isLoggedIn ? "/hesabim" : "/login");
+                  if (!isLoggedIn) {
+                    router.push("/login");
+                    return;
+                  }
+
+                  if (userRole === "admin" || userRole === "super_admin") {
+                    router.push("/admin");
+                    return;
+                  }
+
+                  if (userRole === "supplier") {
+                    router.push("/tedarikci");
+                    return;
+                  }
+
+                  router.push("/hesabim");
                 }}
                 className="font-semibold text-blue-600"
                 disabled={authLoading}
               >
-                {authLoading ? "" : isLoggedIn ? "Hesabım" : "Giriş Yap"}
+                {authLoading
+                  ? ""
+                  : !isLoggedIn
+                  ? "Giriş Yap"
+                  : userRole === "admin" || userRole === "super_admin"
+                  ? "Yönetim Paneli"
+                  : userRole === "supplier"
+                  ? "Tedarikçi Paneli"
+                  : "Hesabım"}
               </button>
 
             </div>
