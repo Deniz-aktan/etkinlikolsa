@@ -115,13 +115,19 @@ export default function SuppliersPage() {
     ]);
 
     if (supplierError) {
-      console.error(supplierError);
-      setError("Tedarikçiler yüklenemedi.");
+      console.error("SUPPLIER LOAD ERROR:", supplierError);
+      setError(
+        "Tedarikçiler yüklenemedi: " +
+          supplierError.message
+      );
     }
 
     if (eventError) {
-      console.error(eventError);
-      setError("Etkinlikler yüklenemedi.");
+      console.error("EVENT LOAD ERROR:", eventError);
+      setError(
+        "Etkinlikler yüklenemedi: " +
+          eventError.message
+      );
     }
 
     setSuppliers(supplierData || []);
@@ -159,6 +165,7 @@ export default function SuppliersPage() {
     const cleanContactName = contactName.trim();
     const cleanEmail = email.trim().toLowerCase();
     const cleanPhone = phone.trim();
+    const cleanDescription = description.trim();
 
     if (
       !cleanCompanyName ||
@@ -180,30 +187,117 @@ export default function SuppliersPage() {
     setSaving(true);
 
     try {
+      /*
+       * AKTİF OTURUMU AL
+       */
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw new Error(
+          "Oturum kontrol edilemedi: " +
+            sessionError.message
+        );
+      }
+
+      if (!session) {
+        throw new Error(
+          "Admin oturumu bulunamadı. Lütfen tekrar giriş yap."
+        );
+      }
+
+      /*
+       * EDGE FUNCTION ÇAĞRISI
+       *
+       * Authorization tokenını açıkça gönderiyoruz.
+       */
       const { data, error: functionError } =
         await supabase.functions.invoke(
           "create-supplier",
           {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+
             body: {
               company_name: cleanCompanyName,
               contact_name: cleanContactName,
               email: cleanEmail,
               phone: cleanPhone,
               password,
-              description: description.trim(),
+              description: cleanDescription,
               event_ids: selectedEvents,
             },
           }
         );
 
+      /*
+       * EDGE FUNCTION HATASINI DETAYLI YAKALA
+       */
       if (functionError) {
-        console.error(functionError);
-        throw new Error(
-          functionError.message ||
-            "Tedarikçi oluşturulamadı."
+        console.error(
+          "EDGE FUNCTION ERROR:",
+          functionError
         );
+
+        let detailedMessage =
+          functionError.message ||
+          "Tedarikçi oluşturulamadı.";
+
+        /*
+         * Supabase FunctionsHttpError içerisinde
+         * gerçek Response nesnesi bulunabilir.
+         */
+        const response =
+          (
+            functionError as {
+              context?: Response;
+            }
+          ).context;
+
+        if (response) {
+          try {
+            const responseText =
+              await response.clone().text();
+
+            if (responseText) {
+              try {
+                const parsed =
+                  JSON.parse(responseText);
+
+                if (parsed?.error) {
+                  detailedMessage =
+                    parsed.error;
+                } else if (
+                  parsed?.message
+                ) {
+                  detailedMessage =
+                    parsed.message;
+                } else {
+                  detailedMessage =
+                    responseText;
+                }
+              } catch {
+                detailedMessage =
+                  responseText;
+              }
+            }
+          } catch (readError) {
+            console.error(
+              "FUNCTION RESPONSE READ ERROR:",
+              readError
+            );
+          }
+        }
+
+        throw new Error(detailedMessage);
       }
 
+      /*
+       * FUNCTION BAŞARILI CEVAP VERDİ Mİ?
+       */
       if (!data?.success) {
         throw new Error(
           data?.error ||
@@ -211,6 +305,9 @@ export default function SuppliersPage() {
         );
       }
 
+      /*
+       * BAŞARILI
+       */
       setMessage(
         "Tedarikçi başarıyla oluşturuldu ve seçilen etkinlikler atandı."
       );
@@ -220,7 +317,10 @@ export default function SuppliersPage() {
 
       await loadData();
     } catch (err) {
-      console.error(err);
+      console.error(
+        "CREATE SUPPLIER ERROR:",
+        err
+      );
 
       setError(
         err instanceof Error
@@ -232,7 +332,9 @@ export default function SuppliersPage() {
     }
   }
 
-  async function deleteSupplier(supplier: Supplier) {
+  async function deleteSupplier(
+    supplier: Supplier
+  ) {
     const confirmed = window.confirm(
       `${supplier.company_name} tedarikçisini silmek istediğine emin misin?\n\nBu işlem tedarikçi kaydını siler.`
     );
@@ -242,26 +344,33 @@ export default function SuppliersPage() {
     setError("");
     setMessage("");
 
-    const { error: deleteError } = await supabase
-      .from("suppliers")
-      .delete()
-      .eq("id", supplier.id);
+    const { error: deleteError } =
+      await supabase
+        .from("suppliers")
+        .delete()
+        .eq("id", supplier.id);
 
     if (deleteError) {
-      console.error(deleteError);
+      console.error(
+        "DELETE SUPPLIER ERROR:",
+        deleteError
+      );
+
       setError(
         "Tedarikçi silinemedi: " +
           deleteError.message
       );
+
       return;
     }
 
     setMessage("Tedarikçi kaydı silindi.");
+
     await loadData();
   }
 
-  const filteredSuppliers = suppliers.filter(
-    (supplier) => {
+  const filteredSuppliers =
+    suppliers.filter((supplier) => {
       const text = [
         supplier.company_name,
         supplier.contact_name,
@@ -271,9 +380,10 @@ export default function SuppliersPage() {
         .join(" ")
         .toLowerCase();
 
-      return text.includes(search.toLowerCase());
-    }
-  );
+      return text.includes(
+        search.toLowerCase()
+      );
+    });
 
   if (loading) {
     return (
@@ -296,7 +406,9 @@ export default function SuppliersPage() {
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-8">
           <div>
             <button
-              onClick={() => router.push("/admin")}
+              onClick={() =>
+                router.push("/admin")
+              }
               className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-blue-600"
             >
               <ArrowLeft size={16} />
@@ -331,9 +443,23 @@ export default function SuppliersPage() {
         )}
 
         {error && (
-          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-            <X size={19} />
-            {error}
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+            <div className="flex items-start gap-3">
+              <X
+                size={19}
+                className="mt-0.5 shrink-0"
+              />
+
+              <div className="min-w-0">
+                <p className="font-black">
+                  İşlem başarısız
+                </p>
+
+                <p className="mt-1 break-words whitespace-pre-wrap">
+                  {error}
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -615,7 +741,9 @@ export default function SuppliersPage() {
                         type="email"
                         value={email}
                         onChange={(e) =>
-                          setEmail(e.target.value)
+                          setEmail(
+                            e.target.value
+                          )
                         }
                         placeholder="tedarikci@email.com"
                         className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 outline-none focus:border-blue-500"
@@ -638,7 +766,9 @@ export default function SuppliersPage() {
                       <input
                         value={phone}
                         onChange={(e) =>
-                          setPhone(e.target.value)
+                          setPhone(
+                            e.target.value
+                          )
                         }
                         placeholder="05XX XXX XX XX"
                         className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 outline-none focus:border-blue-500"
@@ -656,7 +786,9 @@ export default function SuppliersPage() {
                       type="password"
                       value={password}
                       onChange={(e) =>
-                        setPassword(e.target.value)
+                        setPassword(
+                          e.target.value
+                        )
                       }
                       placeholder="En az 6 karakter"
                       className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
@@ -771,7 +903,16 @@ export default function SuppliersPage() {
                 {/* HATA */}
                 {error && (
                   <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-                    {error}
+                    <div className="flex items-start gap-3">
+                      <X
+                        size={18}
+                        className="mt-0.5 shrink-0"
+                      />
+
+                      <p className="break-words whitespace-pre-wrap">
+                        {error}
+                      </p>
+                    </div>
                   </div>
                 )}
 
